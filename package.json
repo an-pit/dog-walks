@@ -1,0 +1,15 @@
+{
+  "name": "dog-walks-app",
+  "version": "1.0.0",
+  "description": "Приложение для учёта прогулок с собакой",
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:frontend": "cd frontend && npm run build",
+    "start:backend": "cd backend && npm start",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+  },
+  "keywords": ["dog", "walks", "calendar", "statistics"],
+  "author": "",
+  "license": "MIT"
+}

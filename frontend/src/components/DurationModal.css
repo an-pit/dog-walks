@@ -1,0 +1,140 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-content h3 {
+  margin: 0 0 10px 0;
+  color: #2c3e50;
+  text-align: center;
+}
+
+.modal-info {
+  text-align: center;
+  color: #666;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.duration-input {
+  margin-bottom: 20px;
+}
+
+.duration-input label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.duration-input input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: border-color 0.3s;
+}
+
+.duration-input input:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.duration-presets {
+  margin-bottom: 25px;
+  text-align: center;
+}
+
+.duration-presets span {
+  display: block;
+  margin-bottom: 10px;
+  color: #666;
+  font-size: 14px;
+}
+
+.duration-presets button {
+  margin: 0 5px 5px 0;
+  padding: 8px 12px;
+  border: 1px solid #3498db;
+  background: white;
+  color: #3498db;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 14px;
+}
+
+.duration-presets button:hover {
+  background: #3498db;
+  color: white;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.cancel-btn, .save-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.cancel-btn {
+  background: #95a5a6;
+  color: white;
+}
+
+.cancel-btn:hover {
+  background: #7f8c8d;
+}
+
+.save-btn {
+  background: #27ae60;
+  color: white;
+}
+
+.save-btn:hover {
+  background: #219a52;
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    padding: 20px;
+    margin: 20px;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+  }
+  
+  .duration-presets button {
+    margin: 2px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}
