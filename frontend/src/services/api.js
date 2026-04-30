@@ -12,13 +12,13 @@ export const api = {
   },
 
   // Обновить прогулку
-  async updateWalk(date, slot, person, duration = 0) {
+  async updateWalk(date, slot, person, duration = 0, comments = '') {
     const response = await fetch(`${API_BASE}/walks/${date}/${slot}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ person, duration })
+      body: JSON.stringify({ person, duration, comments })
     })
     
     if (!response.ok) {

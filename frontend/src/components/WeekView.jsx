@@ -26,13 +26,15 @@ function WeekView() {
     try {
       const data = await api.getWalks(weekStart, weekEnd)
       
-      // Преобразуем в удобный формат: { '2024-01-01': { morning: 'andrey', ... } }
+      // Преобразуем в удобный формат: { '2024-01-01': { morning: 'andrey', morning_duration: 30, morning_comments: '...' } }
       const walksMap = {}
       data.forEach(walk => {
         if (!walksMap[walk.walk_date]) {
           walksMap[walk.walk_date] = {}
         }
         walksMap[walk.walk_date][walk.slot] = walk.person
+        walksMap[walk.walk_date][`${walk.slot}_duration`] = walk.duration || 0
+        walksMap[walk.walk_date][`${walk.slot}_comments`] = walk.comments || ''
       })
       
       setWalks(walksMap)
@@ -49,11 +51,11 @@ function WeekView() {
     setModalOpen(true)
   }
 
-  const handleSaveDuration = async (duration) => {
+  const handleSaveDuration = async (duration, comments) => {
     const currentPerson = walks[currentDate]?.[currentSlot] || 'none'
     
     try {
-      await api.updateWalk(currentDate, currentSlot, currentPerson, duration)
+      await api.updateWalk(currentDate, currentSlot, currentPerson, duration, comments)
       
       // Обновляем локальное состояние
       setWalks(prev => ({
@@ -61,7 +63,8 @@ function WeekView() {
         [currentDate]: {
           ...prev[currentDate],
           [currentSlot]: currentPerson,
-          [`${currentSlot}_duration`]: duration
+          [`${currentSlot}_duration`]: duration,
+          [`${currentSlot}_comments`]: comments
         }
       }))
     } catch (err) {
@@ -77,7 +80,8 @@ function WeekView() {
 
     try {
       const currentDuration = walks[date]?.[`${slot}_duration`] || 0
-      await api.updateWalk(date, slot, nextPerson, currentDuration)
+      const currentComments = walks[date]?.[`${slot}_comments`] || ''
+      await api.updateWalk(date, slot, nextPerson, currentDuration, currentComments)
       
       // Обновляем локальное состояние
       setWalks(prev => ({
@@ -186,6 +190,7 @@ function WeekView() {
         onClose={() => setModalOpen(false)}
         onSave={handleSaveDuration}
         currentDuration={walks[currentDate]?.[`${currentSlot}_duration`] || 0}
+        currentComments={walks[currentDate]?.[`${currentSlot}_comments`] || ''}
         slotLabel={SLOTS[currentSlot]}
         dateLabel={currentDate ? new Date(currentDate).toLocaleDateString('ru-RU') : ''}
       />

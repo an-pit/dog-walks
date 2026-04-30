@@ -17,6 +17,7 @@ db.exec(`
     slot TEXT NOT NULL CHECK (slot IN ('morning', 'afternoon', 'evening')),
     person TEXT NOT NULL CHECK (person IN ('andrey', 'ira', 'both', 'none')),
     duration INTEGER DEFAULT 0,
+    comments TEXT DEFAULT '',
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(walk_date, slot)
   )

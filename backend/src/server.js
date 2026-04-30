@@ -56,7 +56,7 @@ app.get('/api/walks', (req, res) => {
 app.put('/api/walks/:date/:slot', (req, res) => {
   try {
     const { date, slot } = req.params;
-    const { person, duration = 0 } = req.body;
+    const { person, duration = 0, comments = '' } = req.body;
     
     if (!isValidDate(date)) {
       return res.status(400).json({ error: 'Неверный формат даты. Используйте YYYY-MM-DD' });
@@ -78,11 +78,11 @@ app.put('/api/walks/:date/:slot', (req, res) => {
     
     // Вставляем или обновляем запись
     const result = db.prepare(`
-      INSERT INTO walks (walk_date, slot, person, duration)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO walks (walk_date, slot, person, duration, comments)
+      VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(walk_date, slot)
-      DO UPDATE SET person = excluded.person, duration = excluded.duration, updated_at = CURRENT_TIMESTAMP
-    `).run(date, slot, person, durationNum);
+      DO UPDATE SET person = excluded.person, duration = excluded.duration, comments = excluded.comments, updated_at = CURRENT_TIMESTAMP
+    `).run(date, slot, person, durationNum, comments);
     
     res.json({
       success: true,
@@ -176,7 +176,7 @@ app.get('/api/export', (req, res) => {
     `).all(from, to);
     
     // Формируем CSV
-    let csv = 'Дата,Слот,Кто гулял,Длительность (мин)\n';
+    let csv = 'Дата,Слот,Кто гулял,Длительность (мин),Комментарий\n';
     
     walks.forEach(walk => {
       const personMap = {
@@ -192,7 +192,9 @@ app.get('/api/export', (req, res) => {
         'evening': 'Вечер'
       };
       
-      csv += `${walk.walk_date},${slotMap[walk.slot]},${personMap[walk.person]},${walk.duration || 0}\n`;
+      // Экранируем комментарии для CSV (заменяем запятые и кавычки)
+      const escapedComments = (walk.comments || '').replace(/"/g, '""').replace(/,/g, ';');
+      csv += `${walk.walk_date},${slotMap[walk.slot]},${personMap[walk.person]},${walk.duration || 0},"${escapedComments}"\n`;
     });
     
     res.setHeader('Content-Type', 'text/csv');

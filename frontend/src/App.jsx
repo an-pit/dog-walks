@@ -5,7 +5,7 @@ import StatsPage from './components/StatsPage'
 import './App.css'
 
 function App() {
-  const [currentView, setCurrentView] = useState('week')
+  const [currentView, setCurrentView] = useState('day')
 
   const renderView = () => {
     switch (currentView) {

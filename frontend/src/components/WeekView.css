@@ -145,28 +145,53 @@
 
 /* Адаптивность */
 @media (max-width: 768px) {
+  .week-view {
+    padding: 10px;
+    overflow-x: auto;
+  }
+  
   .week-grid {
-    grid-template-columns: 80px repeat(7, 1fr);
+    grid-template-columns: 80px repeat(7, minmax(60px, 1fr));
     font-size: 12px;
+    min-width: 600px; /* Минимальная ширина для сохранения читаемости */
   }
   
   .slot-label {
     padding: 10px 5px;
     writing-mode: vertical-rl;
     text-orientation: mixed;
+    font-size: 11px;
   }
   
   .slot-cell {
-    padding: 8px 5px;
-    min-height: 60px;
+    padding: 6px 3px;
+    min-height: 50px;
+    gap: 2px;
+  }
+  
+  .slot-header {
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 2px;
   }
   
   .emoji {
-    font-size: 16px;
+    font-size: 14px;
   }
   
   .person-label {
+    font-size: 9px;
+    line-height: 1.1;
+  }
+  
+  .duration-label {
+    font-size: 8px;
+    padding: 1px 3px;
+  }
+  
+  .duration-btn, .person-change-btn {
     font-size: 10px;
+    padding: 1px 3px;
   }
   
   .week-navigation {
@@ -177,5 +202,57 @@
   
   .week-navigation button {
     width: 100%;
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+  
+  .day-header {
+    padding: 8px 5px;
+  }
+  
+  .weekday {
+    font-size: 10px;
+  }
+  
+  .date {
+    font-size: 14px;
+  }
+}
+
+/* Для очень маленьких экранов */
+@media (max-width: 480px) {
+  .week-grid {
+    grid-template-columns: 60px repeat(7, minmax(50px, 1fr));
+    min-width: 500px;
+  }
+  
+  .slot-label {
+    padding: 8px 3px;
+    font-size: 10px;
+  }
+  
+  .slot-cell {
+    padding: 4px 2px;
+    min-height: 45px;
+  }
+  
+  .emoji {
+    font-size: 12px;
+  }
+  
+  .person-label {
+    font-size: 8px;
+  }
+  
+  .day-header {
+    padding: 6px 3px;
+  }
+  
+  .weekday {
+    font-size: 9px;
+  }
+  
+  .date {
+    font-size: 12px;
   }
 }

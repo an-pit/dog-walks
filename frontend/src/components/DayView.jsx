@@ -26,6 +26,8 @@ function DayView() {
       const walksMap = {}
       data.forEach(walk => {
         walksMap[walk.slot] = walk.person
+        walksMap[`${walk.slot}_duration`] = walk.duration || 0
+        walksMap[`${walk.slot}_comments`] = walk.comments || ''
       })
       
       setWalks(walksMap)
@@ -41,16 +43,17 @@ function DayView() {
     setModalOpen(true)
   }
 
-  const handleSaveDuration = async (duration) => {
+  const handleSaveDuration = async (duration, comments) => {
     const currentPerson = walks[currentSlot] || 'none'
     
     try {
-      await api.updateWalk(dateStr, currentSlot, currentPerson, duration)
+      await api.updateWalk(dateStr, currentSlot, currentPerson, duration, comments)
       
       setWalks(prev => ({
         ...prev,
         [currentSlot]: currentPerson,
-        [`${currentSlot}_duration`]: duration
+        [`${currentSlot}_duration`]: duration,
+        [`${currentSlot}_comments`]: comments
       }))
     } catch (err) {
       setError(err.message)
@@ -65,7 +68,8 @@ function DayView() {
 
     try {
       const currentDuration = walks[`${slot}_duration`] || 0
-      await api.updateWalk(dateStr, slot, nextPerson, currentDuration)
+      const currentComments = walks[`${slot}_comments`] || ''
+      await api.updateWalk(dateStr, slot, nextPerson, currentDuration, currentComments)
       
       setWalks(prev => ({
         ...prev,
@@ -165,6 +169,7 @@ function DayView() {
         onClose={() => setModalOpen(false)}
         onSave={handleSaveDuration}
         currentDuration={walks[`${currentSlot}_duration`] || 0}
+        currentComments={walks[`${currentSlot}_comments`] || ''}
         slotLabel={SLOTS[currentSlot]}
         dateLabel={currentDate.toLocaleDateString('ru-RU', {
           weekday: 'long',
