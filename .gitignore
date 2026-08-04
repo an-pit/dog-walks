@@ -78,7 +78,6 @@ dist
 
 # Gatsby files
 .cache/
-public
 
 # Vuepress build output
 .vuepress/dist
@@ -107,3 +106,47 @@ public
 # OS
 .DS_Store
 Thumbs.db
+# Ключи и секреты
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*ssh-keygen*
+.env
+.env.*
+!.env.example
+
+# Базы
+*.db
+*.db-shm
+*.db-wal
+
+# Ключи и секреты
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*ssh-keygen*
+.env
+.env.*
+!.env.example
+
+# Базы
+*.db
+*.db-shm
+*.db-wal
+
+# Ключи и секреты
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*ssh-keygen*
+.env
+.env.*
+!.env.example
+
+# Базы
+*.db
+*.db-shm
+*.db-wal

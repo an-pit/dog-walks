@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: Тесты и сборка
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Версия Node берётся из .nvmrc, чтобы не дублировать её здесь.
+      # Локально, в CI и на сервере используется одна и та же.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Установить зависимости бэкенда
+        working-directory: code/backend
+        run: npm ci
+
+      - name: Прогнать тесты
+        working-directory: code/backend
+        run: npm test
+
+      # Сборка фронтенда здесь не ради артефакта, а как проверка:
+      # опечатка в JSX уронит сборку, и мы узнаем об этом до прода.
+      - name: Собрать фронтенд
+        working-directory: code/frontend
+        run: |
+          npm ci
+          npm run build
