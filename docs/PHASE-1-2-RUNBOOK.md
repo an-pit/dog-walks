@@ -159,21 +159,90 @@ id_ed25519*
 
 Сейчас путь к базе зашит в коде, а сама база лежит внутри папки проекта. Это опасно: при автодеплое `git reset --hard` может её снести. Выносим наружу.
 
-Создайте `code/backend/.env.example` — шаблон, который коммитится:
+Нужны два файла рядом друг с другом:
 
+| Файл | Что в нём | Попадает в git |
+|---|---|---|
+| `.env.example` | шаблон с именами переменных и безопасными значениями | **да** |
+| `.env` | реальные значения этой конкретной машины | **нет**, закрыт `.gitignore` |
+
+Смысл пары такой: `.env.example` показывает, какие переменные вообще нужны приложению, чтобы через полгода не гадать. А `.env` у каждого свой — у вас локально путь один, на сервере другой, и в репозиторий он не попадает.
+
+Перейдите в папку бэкенда:
+
+```bash
+cd /Users/pitushkin/Yandex.Disk.localized/Claude/projects/dog-walks-app/code/backend
 ```
+
+Создайте шаблон:
+
+```bash
+cat > .env.example << 'EOF'
+# Порт, на котором слушает бэкенд
 PORT=3000
+
+# Путь к файлу базы SQLite.
+# Локально — внутри проекта, на сервере — /var/lib/dog-walks/walks.db
 DB_PATH=./database/walks.db
+EOF
 ```
 
-И `code/backend/.env` — реальный локальный, он в `.gitignore`:
+Здесь `>` (перезаписать), а не `>>` (дописать), потому что файла ещё нет и мы создаём его с нуля. Кавычки вокруг `EOF` не дают bash трогать содержимое.
+
+Теперь рабочий файл. Раз значения пока совпадают с шаблоном, проще скопировать:
+
+```bash
+cp .env.example .env
+```
+
+Проверьте, что оба на месте и с нужным содержимым:
+
+```bash
+ls -la .env .env.example
+cat .env
+```
+
+Убедитесь, что `.env` действительно закрыт от git, а `.env.example` — нет:
+
+```bash
+git check-ignore -v .env
+git check-ignore -v .env.example
+```
+
+Читать вывод надо по знаку `!` в начале правила, а не по факту наличия строки:
 
 ```
-PORT=3000
-DB_PATH=./database/walks.db
+.gitignore:145:.env            .env           ← правило обычное → файл игнорируется
+.gitignore:147:!.env.example   .env.example   ← правило с «!» → файл НЕ игнорируется
 ```
 
-Node 18 умеет читать `.env` сам через флаг `--env-file`, отдельная библиотека не нужна.
+С флагом `-v` git печатает любое сработавшее правило, включая отрицающие, и в обоих случаях возвращает код 0. Поэтому молчания от второй команды ждать не надо — наоборот, строка с `!.env.example` означает, что исключение на месте и всё настроено верно.
+
+> Без `-v` поведение другое: `git check-ignore .env.example` ничего не выведет и вернёт код 1 именно потому, что файл не игнорируется. Легко перепутать эти два режима.
+
+Самая надёжная проверка — посмотреть, что git реально готов положить в коммит:
+
+```bash
+cd /Users/pitushkin/Yandex.Disk.localized/Claude/projects/dog-walks-app
+git add -A
+git status --short
+```
+
+В списке должен быть `code/backend/.env.example` и **не должно быть** `code/backend/.env`. Это окончательный ответ: `git status` показывает фактическое поведение, а не теоретическое совпадение правил.
+
+Если `.env` всё-таки виден — уберите его из индекса и разберитесь с `.gitignore`, не коммитьте:
+
+```bash
+git restore --staged code/backend/.env
+```
+
+```bash
+git commit -m "chore: шаблон переменных окружения для бэкенда"
+```
+
+Node 18 читает `.env` сам, через флаг `--env-file` — он уже прописан в скрипте `dev` в разделе 2.3. Отдельная библиотека вроде `dotenv` не нужна.
+
+> На сервере `.env` не понадобится: там переменные задаются через `ecosystem.config.cjs` в блоке 6.2, это способ PM2.
 
 ## 2.2. Разложить бэкенд на части
 
@@ -307,10 +376,51 @@ createApp(db).listen(PORT, () => {
 }
 ```
 
-## 2.4. Проверить, что всё работает
+## 2.4. Согласовать версию Node
+
+На вашей машине Node 24, на сервере — Node 18. Это разрыв, который рано или поздно даст «у меня работает, а на проде нет». Приводим к одному знаменателю.
+
+Node 18 снят с поддержки и не получает патчей безопасности. Node 24 с марта 2026 — Active LTS, поддержка до апреля 2028. Берём его на обеих сторонах.
+
+Зафиксируйте версию в репозитории — файл `.nvmrc` в корне:
 
 ```bash
-cd code/backend && npm install && npm run dev
+cd /Users/pitushkin/Yandex.Disk.localized/Claude/projects/dog-walks-app
+echo "24" > .nvmrc
+```
+
+Теперь `nvm use` в этой папке будет сам переключаться на нужную версию, а CI сможет прочитать её из файла вместо того, чтобы дублировать номер в конфиге.
+
+**`better-sqlite3` тоже надо поднять.** Версия 9.x вышла в 2023 году и не имеет готовых бинарников под Node 24 — npm пытается собрать её из исходников и падает на `error: "C++20 or later required."`. Начиная с 12.0.0 готовые бинарники под Node 24 есть, собирать ничего не нужно. В `package.json` уже проставлено `^12.10.0`.
+
+Обновление сервера на Node 24 — в блоке 6.0.
+
+## 2.5. Создать lock-файлы — обязательный шаг
+
+В репозитории сейчас **нет ни одного `package-lock.json`**. Это тихая мина под будущий CI: `npm ci` из блока 5 без lock-файла просто откажется работать с ошибкой `npm ci can only install packages when your package.json and package-lock.json are in sync`.
+
+Lock-файл фиксирует точные версии всех зависимостей, включая вложенные. Без него `npm install` на вашей машине, в CI и на сервере может поставить разные версии, и «у меня работает» перестаёт что-либо значить.
+
+```bash
+cd code/backend && npm install
+cd ../frontend && npm install
+```
+
+Проверьте, что файлы появились и не игнорируются:
+
+```bash
+cd /Users/pitushkin/Yandex.Disk.localized/Claude/projects/dog-walks-app
+ls code/backend/package-lock.json code/frontend/package-lock.json
+git status --short
+```
+
+Оба `package-lock.json` должны быть видны в `git status`. Их обязательно коммитить — это часть исходного кода, а не мусор сборки.
+
+## 2.6. Проверить, что всё работает
+
+```bash
+cd code/backend && npm test
+npm run dev
 ```
 
 В другом окне:
@@ -531,7 +641,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version-file: '.nvmrc'
 
       - name: Установить зависимости бэкенда
         working-directory: code/backend
@@ -572,6 +682,39 @@ git push -u origin chore/add-ci
 ---
 
 # Блок 6. Подготовить сервер
+
+## 6.0. Обновить Node на сервере до 24
+
+Сейчас на VM стоит Node 18 — он снят с поддержки и не получает обновлений безопасности. Плюс на нём не соберётся `better-sqlite3` в новой версии. Обновляем до той же версии, что и локально.
+
+```bash
+ssh dogwalks
+node --version        # покажет v18.x
+```
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+sudo apt-get install -y nodejs
+node --version        # должно стать v24.x
+```
+
+После обновления Node нативные модули надо пересобрать — бинарник `better-sqlite3` скомпилирован под старую версию и просто не загрузится:
+
+```bash
+cd /opt/dog-walks-app/code/backend 2>/dev/null || cd /opt/dog-walks-app/backend
+rm -rf node_modules
+npm ci --omit=dev
+pm2 restart dog-walks-backend
+pm2 logs dog-walks-backend --lines 20 --nostream
+```
+
+В логах не должно быть `NODE_MODULE_VERSION` или `invalid ELF header`. Проверьте, что приложение отвечает:
+
+```bash
+curl -s http://localhost:3000/api/walks?from=2026-08-01\&to=2026-08-02
+```
+
+> Если что-то пойдёт не так — база лежит отдельно и не пострадает, а откатиться можно, поставив обратно `setup_18.x`. Но сначала убедитесь, что свежий бэкап базы у вас на руках.
 
 ## 6.1. Вынести базу из папки проекта
 
@@ -787,7 +930,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version-file: '.nvmrc'
       - working-directory: code/backend
         run: npm ci && npm test
 
