@@ -7,7 +7,6 @@ on:
 
 jobs:
   test:
-    name: Тесты и сборка
     runs-on: ubuntu-latest
 
     steps:
