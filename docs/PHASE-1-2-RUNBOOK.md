@@ -683,53 +683,88 @@ git push -u origin chore/add-ci
 
 # Блок 6. Подготовить сервер
 
-## 6.0. Обновить Node на сервере до 24
+> ⚠️ **Порядок шагов внутри блока строгий.** Код обновляется раньше Node, а Node раньше пересборки модулей. Если сначала поднять Node до 24, сервер окажется в состоянии «новый Node + старый `better-sqlite3` 9.x», а эта версия под Node 24 не собирается — приложение встанет.
 
-Сейчас на VM стоит Node 18 — он снят с поддержки и не получает обновлений безопасности. Плюс на нём не соберётся `better-sqlite3` в новой версии. Обновляем до той же версии, что и локально.
+## 6.0. Бэкап и остановка
 
 ```bash
 ssh dogwalks
-node --version        # покажет v18.x
+cp /opt/dog-walks-app/backend/database/walks.db ~/walks-backup-$(date +%Y%m%d_%H%M).db
+ls -lh ~/walks-backup-*.db
 ```
 
+Скопируйте бэкап и к себе на машину — на сервере он от гибели диска не спасёт:
+
 ```bash
+scp dogwalks:~/walks-backup-*.db ~/dog-walks-backups/
+```
+
+Останавливаем приложение на время работ:
+
+```bash
+pm2 stop dog-walks-backend
+```
+
+## 6.1. Забрать новый код
+
+Делаем это **до** обновления Node: в новом коде уже прописан `better-sqlite3` 12.x, который под Node 24 ставится из готовых бинарников без компиляции.
+
+```bash
+cd /opt/dog-walks-app
+git remote set-url origin https://github.com/an-pit/dog-walks.git
+git fetch origin
+git reset --hard origin/main
+ls
+```
+
+Должны появиться папки `code/`, `docs/`, `.github/` и файл `.nvmrc`.
+
+> `git reset --hard` перезаписывает всё содержимое папки. База пока лежит внутри неё, в `backend/database/` — именно поэтому шагом раньше мы сняли бэкап, а в 6.3 вынесем базу наружу навсегда.
+
+## 6.2. Обновить Node до 24
+
+Node 18 снят с поддержки и не получает патчей безопасности.
+
+```bash
+node --version        # покажет v18.x
 curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt-get install -y nodejs
 node --version        # должно стать v24.x
 ```
 
-После обновления Node нативные модули надо пересобрать — бинарник `better-sqlite3` скомпилирован под старую версию и просто не загрузится:
+Теперь ставим зависимости заново. Нативные модули привязаны к версии Node, поэтому старый `node_modules` надо снести целиком, а не досоздавать:
 
 ```bash
-cd /opt/dog-walks-app/code/backend 2>/dev/null || cd /opt/dog-walks-app/backend
+cd /opt/dog-walks-app/code/backend
 rm -rf node_modules
 npm ci --omit=dev
-pm2 restart dog-walks-backend
-pm2 logs dog-walks-backend --lines 20 --nostream
 ```
 
-В логах не должно быть `NODE_MODULE_VERSION` или `invalid ELF header`. Проверьте, что приложение отвечает:
+Проверьте, что нативный модуль действительно загружается:
 
 ```bash
-curl -s http://localhost:3000/api/walks?from=2026-08-01\&to=2026-08-02
+node -e "import('better-sqlite3').then(m=>{const d=new m.default(':memory:');console.log('модуль OK');d.close()}).catch(e=>console.error('СЛОМАН:',e.message))"
 ```
 
-> Если что-то пойдёт не так — база лежит отдельно и не пострадает, а откатиться можно, поставив обратно `setup_18.x`. Но сначала убедитесь, что свежий бэкап базы у вас на руках.
+Ожидаем `модуль OK`. Ошибки вида `NODE_MODULE_VERSION` или `invalid ELF header` означают, что бинарник остался от старой версии Node — повторите `rm -rf node_modules && npm ci --omit=dev`.
 
-## 6.1. Вынести базу из папки проекта
-
-Сейчас база лежит внутри `/opt/dog-walks-app/backend/database/`. Автодеплой делает `git reset --hard`, и однажды это её снесёт. Переносим.
-
-**Сначала бэкап** (если ещё не делали свежий):
+Соберите фронтенд:
 
 ```bash
-scp dogwalks:/opt/dog-walks-app/backend/database/walks.db ~/dog-walks-backups/walks-before-move.db
+cd /opt/dog-walks-app/code/frontend
+npm ci && npm run build
 ```
 
-Теперь на сервере:
+## 6.3. Вынести базу из папки проекта
+
+Автодеплой делает `git reset --hard`, и рано или поздно это снесёт базу, лежащую внутри репозитория. Переносим наружу.
+
+**Убедитесь, что бэкап из 6.0 у вас есть** — `ls -lh ~/walks-backup-*.db` должен что-то показать.
+
+База переживает `git reset --hard`: она в `.gitignore`, а git трогает только отслеживаемые файлы. Поэтому после 6.1 файл всё ещё лежит по старому пути, откуда мы его и забираем:
 
 ```bash
-pm2 stop dog-walks-backend
+ls -lh /opt/dog-walks-app/backend/database/walks.db
 
 sudo mkdir -p /var/lib/dog-walks
 sudo mv /opt/dog-walks-app/backend/database/walks.db /var/lib/dog-walks/
@@ -737,33 +772,106 @@ sudo chown -R ubuntu:ubuntu /var/lib/dog-walks
 ls -lh /var/lib/dog-walks/
 ```
 
-## 6.2. Обновить структуру и пути под `code/`
+Проверьте, что база целая и данные на месте. Для этого нужна консольная утилита `sqlite3` — она не ставится вместе с Node, потому что приложение работает через библиотеку `better-sqlite3`, которой командная строка не нужна. Дальше она пригодится в Блоке 8 для бэкапов, так что ставим:
 
-На сервере лежит старая раскладка, без `code/`. После первого автодеплоя она подтянется из git сама, но nginx и PM2 надо переучить заранее.
+```bash
+sudo apt install sqlite3 -y
+sqlite3 /var/lib/dog-walks/walks.db "SELECT COUNT(*) FROM walks;"
+```
 
-**PM2** — создайте в корне репозитория `ecosystem.config.cjs` (расширение `.cjs`, потому что в проекте включены ES-модули):
+Ожидаем число около 260.
+
+> Если ставить не хочется, то же самое можно спросить через уже установленную библиотеку:
+>
+> ```bash
+> cd /opt/dog-walks-app/code/backend
+> node -e "import('better-sqlite3').then(m=>{const d=new m.default('/var/lib/dog-walks/walks.db');console.log(d.prepare('SELECT COUNT(*) AS n FROM walks').get());d.close()})"
+> ```
+
+Старую пустую папку можно убрать:
+
+```bash
+rm -rf /opt/dog-walks-app/backend
+```
+
+## 6.4. Обновить пути в PM2 и nginx
+
+Код теперь лежит в `code/`, база — в `/var/lib/dog-walks/`. Переучиваем оба сервиса.
+
+### PM2
+
+Файл `ecosystem.config.cjs` создаётся **на вашей машине и едет на сервер через git**, а не пишется руками на сервере. В этом весь смысл: конфигурация перестаёт быть чем-то, что существует в единственном экземпляре на VM и теряется при её пересоздании.
+
+На своей машине, в корне репозитория:
+
+```bash
+cd /Users/pitushkin/Yandex.Disk.localized/Claude/projects/dog-walks-app
+nano ecosystem.config.cjs
+```
+
+Вставьте содержимое ниже, сохраните (`Ctrl+O`, `Enter`, `Ctrl+X`).
+
+Расширение именно `.cjs`, а не `.js`: в `package.json` указан `"type": "module"`, поэтому все `.js` в проекте считаются ES-модулями, а PM2 ждёт CommonJS с `module.exports`. Расширение `.cjs` явно говорит Node читать файл как CommonJS.
 
 ```js
 module.exports = {
-  apps: [{
-    name: 'dog-walks-backend',
-    script: './code/backend/src/server.js',
-    cwd: '/opt/dog-walks-app',
-    instances: 1,
-    autorestart: true,
-    max_memory_restart: '300M',
-    env: {
-      NODE_ENV: 'production',
-      PORT: 3000,
-      DB_PATH: '/var/lib/dog-walks/walks.db',
+  apps: [
+    {
+      name: 'dog-walks-backend',
+      script: './code/backend/src/server.js',
+      cwd: '/opt/dog-walks-app',
+
+      instances: 1,
+      autorestart: true,
+      max_memory_restart: '300M',
+
+      // Логи с отметками времени — иначе непонятно, когда что случилось
+      time: true,
+
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3000,
+        // База вынесена за пределы репозитория: деплой делает git reset --hard,
+        // и внутри папки проекта она бы однажды не пережила выкатку
+        DB_PATH: '/var/lib/dog-walks/walks.db',
+      },
     },
-  }],
+  ],
 };
 ```
 
-Теперь конфигурация PM2 живёт в git, а не только на сервере.
+Отправьте файл через ветку и PR — как любое другое изменение:
 
-**nginx** — `sudo nano /etc/nginx/sites-available/dog-walks`. Поправьте `root` на новый путь и добавьте исключение для health-check:
+```bash
+git checkout main && git pull
+git checkout -b chore/pm2-config
+git add ecosystem.config.cjs
+git commit -m "chore: конфигурация PM2 в репозитории"
+git push -u origin chore/pm2-config
+```
+
+Откройте PR, дождитесь зелёного CI, влейте. Затем заберите на сервере:
+
+```bash
+ssh dogwalks
+cd /opt/dog-walks-app
+git fetch origin && git reset --hard origin/main
+ls ecosystem.config.cjs
+```
+
+Теперь конфигурация PM2 живёт в git, а не только на сервере: при пересоздании VM она приедет сама, а история изменений видна в коммитах.
+
+> Если вы уже открыли другую ветку и не хотите плодить PR ради одного файла — добавьте `ecosystem.config.cjs` в неё. Для проекта на одного человека это нормально; главное, чтобы файл попал в репозиторий, а не остался только на сервере.
+
+### nginx
+
+Конфигурация nginx, наоборот, живёт на сервере — она относится к машине, а не к коду. Правим на месте:
+
+```bash
+sudo nano /etc/nginx/sites-available/dog-walks
+```
+
+Поправьте `root` на новый путь с `code/` и добавьте исключение для health-check:
 
 ```nginx
 server {
@@ -801,7 +909,7 @@ server {
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-## 6.3. Ключ для автодеплоя
+## 6.5. Ключ для автодеплоя
 
 GitHub Actions нужен свой способ зайти на сервер. Личный ключ туда класть нельзя — заводим отдельный, только для деплоя.
 
@@ -837,30 +945,46 @@ ssh -i ~/.ssh/dogwalks_deploy ubuntu@103.76.53.197 "echo сработало"
 
 Секреты в GitHub шифруются и в логах Actions автоматически замазываются звёздочками. Прочитать их обратно через интерфейс нельзя — только перезаписать.
 
-## 6.4. Разово привести сервер к новой структуре
+## 6.6. Запустить и проверить
+
+Код, зависимости и конфиги уже на месте — осталось поднять приложение под новым описанием PM2. Старую запись удаляем: в ней зашиты прежние путь и переменные окружения, `restart` их не обновит.
 
 ```bash
-cd /opt/dog-walks-app
-git remote set-url origin https://github.com/an-pit/dog-walks.git
-git fetch origin
-git reset --hard origin/main
-
-cd code/backend && npm ci --omit=dev
-cd ../frontend && npm ci && npm run build
-
 cd /opt/dog-walks-app
 pm2 delete dog-walks-backend
 pm2 start ecosystem.config.cjs
 pm2 save
 ```
 
-Проверка:
+`pm2 save` записывает текущий список процессов, чтобы после перезагрузки VM приложение поднялось само.
+
+Проверки по возрастанию охвата — от бэкенда наружу:
 
 ```bash
-curl -s http://localhost:3000/api/health
+# 1. Бэкенд отвечает напрямую
+curl -s http://localhost:3000/api/health; echo
+
+# 2. Данные на месте и миграция применилась (в ответе должно быть поле comments)
+curl -s "http://localhost:3000/api/walks?from=2026-08-01&to=2026-08-04"; echo
+
+# 3. Health доступен снаружи без пароля
+curl -s http://103.76.53.197/api/health; echo
+
+# 4. Остальное снаружи требует пароль
+curl -I "http://103.76.53.197/api/walks?from=2026-08-01&to=2026-08-04"
 ```
 
-Ожидаем `{"status":"ok","version":"dev"}`.
+Ожидаем: `{"status":"ok","version":"dev"}`, затем JSON с прогулками, снова `ok`, и наконец `401 Unauthorized`.
+
+Логи, если что-то пошло не так:
+
+```bash
+pm2 logs dog-walks-backend --lines 50 --nostream
+```
+
+В логах при первом запуске должны быть строки вида `✅ Применена миграция v1` и `v2` — это докатилась недостающая колонка `comments`. При последующих запусках будет `✅ База актуальна`.
+
+И финальная проверка — откройте http://103.76.53.197/ в браузере, введите пароль, покликайте по слотам. Комментарии теперь должны сохраняться: до этого момента прод их терял, потому что колонки в базе не было.
 
 ---
 
