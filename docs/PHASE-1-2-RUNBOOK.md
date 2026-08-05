@@ -800,18 +800,19 @@ rm -rf /opt/dog-walks-app/backend
 
 ### PM2
 
-Файл `ecosystem.config.cjs` создаётся **на вашей машине и едет на сервер через git**, а не пишется руками на сервере. В этом весь смысл: конфигурация перестаёт быть чем-то, что существует в единственном экземпляре на VM и теряется при её пересоздании.
+> ✅ **Уже сделано.** `ecosystem.config.cjs` лежит в `main`. Заново создавать и коммитить его не нужно — проверьте и переходите к nginx:
+>
+> ```bash
+> head -8 ecosystem.config.cjs
+> ```
+>
+> Если видите строку `// Конфигурация PM2 для прода.` — всё на месте.
 
-На своей машине, в корне репозитория:
-
-```bash
-cd /Users/pitushkin/Yandex.Disk.localized/Claude/projects/dog-walks-app
-nano ecosystem.config.cjs
-```
-
-Вставьте содержимое ниже, сохраните (`Ctrl+O`, `Enter`, `Ctrl+X`).
+Файл `ecosystem.config.cjs` живёт **в репозитории и едет на сервер через git**, а не пишется руками на сервере. В этом весь смысл: конфигурация перестаёт быть чем-то, что существует в единственном экземпляре на VM и теряется при её пересоздании.
 
 Расширение именно `.cjs`, а не `.js`: в `package.json` указан `"type": "module"`, поэтому все `.js` в проекте считаются ES-модулями, а PM2 ждёт CommonJS с `module.exports`. Расширение `.cjs` явно говорит Node читать файл как CommonJS.
+
+Содержимое для справки:
 
 ```js
 module.exports = {
@@ -840,28 +841,18 @@ module.exports = {
 };
 ```
 
-Отправьте файл через ветку и PR — как любое другое изменение:
-
-```bash
-git checkout main && git pull
-git checkout -b chore/pm2-config
-git add ecosystem.config.cjs
-git commit -m "chore: конфигурация PM2 в репозитории"
-git push -u origin chore/pm2-config
-```
-
-Откройте PR, дождитесь зелёного CI, влейте. Затем заберите на сервере:
+Забрать файл на сервере:
 
 ```bash
 ssh dogwalks
 cd /opt/dog-walks-app
 git fetch origin && git reset --hard origin/main
-ls ecosystem.config.cjs
+head -8 ecosystem.config.cjs
 ```
 
 Теперь конфигурация PM2 живёт в git, а не только на сервере: при пересоздании VM она приедет сама, а история изменений видна в коммитах.
 
-> Если вы уже открыли другую ветку и не хотите плодить PR ради одного файла — добавьте `ecosystem.config.cjs` в неё. Для проекта на одного человека это нормально; главное, чтобы файл попал в репозиторий, а не остался только на сервере.
+> **Если правите файл в будущем** — только через ветку и PR, как любой другой код, и **только в одной ветке за раз**. Если положить один и тот же новый файл в две параллельные ветки, он приедет в `main` двумя путями, и второй PR встретит конфликт на ровном месте.
 
 ### nginx
 
@@ -990,121 +981,126 @@ pm2 logs dog-walks-backend --lines 50 --nostream
 
 # Блок 7. Автодеплой
 
+> ✅ **Файлы уже созданы** в вашей рабочей папке: `scripts/deploy.sh` и `.github/workflows/deploy.yml`. Читать их содержимое полезно, но набирать заново не нужно — сразу переходите к 7.3.
+
+**Где что живёт.** Оба файла лежат **в репозитории**, а не пишутся руками на сервере:
+
+| Файл | Где хранится | Где выполняется |
+|---|---|---|
+| `.github/workflows/deploy.yml` | репозиторий | на серверах GitHub |
+| `scripts/deploy.sh` | репозиторий | на вашей VM |
+
+`deploy.sh` попадает на сервер двумя путями сразу. Во-первых, GitHub Actions читает его из склонированного репозитория и передаёт по SSH на выполнение — то есть выполняется всегда та версия, что лежит в `main`. Во-вторых, после первой же выкатки файл окажется и на диске сервера вместе с остальным кодом, так что его можно запустить руками, если понадобится.
+
 ## 7.1. Скрипт деплоя
 
-Создайте `scripts/deploy.sh` в корне репозитория:
+Лежит в `scripts/deploy.sh`. Что он делает по шагам:
+
+1. Запоминает текущий коммит — это точка отката
+2. Забирает свежий `main`
+3. Ставит зависимости бэкенда, собирает фронтенд
+4. `pm2 reload` — новый процесс поднимается до того, как гаснет старый, поэтому простоя почти нет. Миграции применяются сами при старте `server.js`
+5. До десяти раз с интервалом 2 секунды дёргает `/api/health`
+6. Если health так и не ответил — возвращает предыдущий коммит, пересобирает и перезапускает
+
+Первая строка после комментариев — `set -euo pipefail`. Она важнее, чем кажется: без неё скрипт продолжит работу после падения `npm ci` и радостно «задеплоит» сломанное.
+
+## 7.2. Workflow
+
+Лежит в `.github/workflows/deploy.yml`. Две задачи:
+
+- `test` — прогоняет тесты заново, уже на слитом состоянии `main`. Зелёный CI на ветке не гарантирует, что после merge всё цело: ветка могла быть собрана до чужих изменений
+- `deploy` — с `needs: test`, поэтому без зелёных тестов не стартует. Кладёт ключ из секретов, ходит по SSH, скармливает серверу `deploy.sh`, затем проверяет `/api/health` снаружи через nginx
+
+`ssh-keyscan` перед подключением нужен, чтобы ssh не спросил «доверяете ли вы этому хосту?» — в автоматике отвечать на такой вопрос некому, и без этой строки задача просто повиснет.
+
+## 7.3. Отправить в репозиторий
+
+Сначала убедитесь, что 6.5 сделан: три секрета `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_USER` должны быть в Settings → Secrets and variables → Actions. Без них выкатка упадёт на шаге подключения.
+
+Дальше как любое изменение — через ветку и PR:
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-APP_DIR=/opt/dog-walks-app
-cd "$APP_DIR"
-
-PREV=$(git rev-parse HEAD)
-echo "▶ Текущая версия: $PREV"
-
-git fetch origin
-git reset --hard origin/main
-echo "▶ Обновлено до: $(git rev-parse HEAD)"
-
-cd "$APP_DIR/code/backend" && npm ci --omit=dev
-cd "$APP_DIR/code/frontend" && npm ci && npm run build
-
-cd "$APP_DIR"
-pm2 reload ecosystem.config.cjs --update-env
-
-echo "▶ Ждём подъёма сервиса..."
-sleep 3
-
-if curl -fsS --max-time 5 http://localhost:3000/api/health > /dev/null; then
-  echo "✅ Деплой прошёл"
-else
-  echo "❌ Health-check не прошёл, откатываемся на $PREV"
-  git reset --hard "$PREV"
-  cd "$APP_DIR/code/backend" && npm ci --omit=dev
-  cd "$APP_DIR/code/frontend" && npm ci && npm run build
-  cd "$APP_DIR" && pm2 reload ecosystem.config.cjs --update-env
-  echo "↩️  Откат выполнен"
-  exit 1
-fi
+cd /Users/pitushkin/Yandex.Disk.localized/Claude/projects/dog-walks-app
+git checkout main && git pull
+git checkout -b chore/autodeploy
 ```
 
-`set -euo pipefail` в первой строке — важная деталь: `-e` останавливает скрипт на первой же ошибке, `-u` ругается на необъявленные переменные, `-o pipefail` ловит ошибки внутри пайпов. Без этого скрипт бодро продолжит работу после падения `npm ci` и «задеплоит» сломанное.
+Проверьте, что у скрипта стоит флаг исполняемости — git его запоминает, и без него сервер откажется запускать файл:
+
+```bash
+ls -l scripts/deploy.sh
+```
+
+В начале строки должно быть `-rwxr-xr-x` (важна буква `x`). Если её нет:
 
 ```bash
 chmod +x scripts/deploy.sh
 ```
 
-## 7.2. Workflow
-
-Создайте `.github/workflows/deploy.yml`:
-
-```yaml
-name: Deploy
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.nvmrc'
-      - working-directory: code/backend
-        run: npm ci && npm test
-
-  deploy:
-    needs: test          # не запустится, пока тесты не прошли
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Настроить SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Выкатить
-        run: |
-          ssh -i ~/.ssh/id_ed25519 \
-              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-              'bash -s' < scripts/deploy.sh
-
-      - name: Проверить снаружи
-        run: |
-          curl -fsS --max-time 10 \
-            http://${{ secrets.DEPLOY_HOST }}/api/health | tee /dev/stderr | grep -q '"status":"ok"'
-```
-
-`needs: test` — ключевая строка. Она делает так, что деплой физически не начнётся, пока тесты не зелёные.
-
-Последний шаг проверяет сервис снаружи, через nginx — это ловит случаи, когда бэкенд жив, а nginx настроен криво.
-
-## 7.3. Первый запуск
+Коммитим и отправляем:
 
 ```bash
-git checkout -b chore/add-deploy
-git add .github/workflows/deploy.yml scripts/deploy.sh ecosystem.config.cjs
+git add scripts/deploy.sh .github/workflows/deploy.yml
+git status --short
 git commit -m "chore: автодеплой на push в main"
-git push -u origin chore/add-deploy
+git push -u origin chore/autodeploy
 ```
 
-PR → merge → откройте вкладку **Actions** и смотрите, как всё едет. Первый раз почти наверняка что-нибудь упадёт — это нормально, логи в Actions подробные, покажете мне вывод, разберём.
+В `git status` должны быть ровно два файла. Дальше — открыть PR, дождаться зелёного `test`, влить.
+
+## 7.4. Первая выкатка
+
+Как только PR влит, `deploy.yml` окажется в `main` — и push в `main`, которым он туда попал, сам же и запустит первую выкатку.
+
+Откройте вкладку **Actions** и смотрите на запуск **Deploy**. Разверните шаг «Выкатить»: там будет вывод скрипта с сервера, с теми самыми `▶` и `✅`.
+
+**Первый раз почти наверняка что-нибудь упадёт.** Самые частые причины:
+
+| Что в логе | Что делать |
+|---|---|
+| `Permission denied (publickey)` | Публичная часть ключа не попала в `~/.ssh/authorized_keys` на сервере, либо в секрет `DEPLOY_SSH_KEY` скопирована не вся приватная часть — она должна включать строки `-----BEGIN` и `-----END` |
+| `Host key verification failed` | Не отработал `ssh-keyscan`; проверьте, что `DEPLOY_HOST` содержит только IP, без `http://` и без слэша |
+| `Permission denied` при `git reset` | Файлы в `/opt/dog-walks-app` принадлежат не `ubuntu`. Почините: `sudo chown -R ubuntu:ubuntu /opt/dog-walks-app` |
+| `pm2: command not found` | PM2 стоит глобально для интерактивной сессии, а неинтерактивный SSH не подхватывает PATH. Лечится строкой `export PATH=$PATH:/usr/local/bin` в начале `deploy.sh` |
+| `deploy.sh: Permission denied` | Забыт `chmod +x` перед коммитом |
+
+Логи подробные — покажите вывод, разберём.
+
+## 7.5. Проверить, что цикл замкнулся
+
+Настоящая проверка — провести через новый процесс безобидное изменение и увидеть его на проде:
+
+```bash
+git checkout main && git pull
+git checkout -b test/deploy-check
+```
+
+Поменяйте что-нибудь заметное и безвредное — например, заголовок в `code/frontend/index.html`. Затем:
+
+```bash
+git add -A
+git commit -m "test: проверка автодеплоя"
+git push -u origin test/deploy-check
+```
+
+PR → зелёный CI → merge. Дальше ничего руками не делаете: смотрите Actions, ждёте зелёного Deploy, обновляете http://103.76.53.197/ и видите правку.
+
+С этого момента прод обновляется сам, а расхождение между `main` и сервером — то самое, из-за которого поле `comments` месяцами не доезжало, — становится невозможным.
 
 ---
 
 # Блок 8. Бэкапы
 
-Сейчас бэкапов нет вообще. Даже простой вариант радикально лучше, чем ничего.
+Сейчас бэкапов нет. Год статистики прогулок живёт в одном файле на одном диске одной виртуалки — восстановить его будет неоткуда.
 
-## 8.1. Локальные, на сервере
+Делаем в два уровня: ежедневный снимок на сервере и копия в Object Storage, чтобы пережить гибель самой VM.
+
+> ⚠️ Команды `s3cmd --configure`, `crontab -e` и `htpasswd` интерактивные. Запускайте их **по одной**, не вставляя блоком: следующая строка будет съедена как ответ на приглашение.
+
+## 8.1. Скрипт бэкапа
+
+Утилита `sqlite3` уже стоит (ставили в 6.3). Она нужна именно ради `.backup` — это единственный способ снять согласованный снимок SQLite: обычный `cp` во время записи может дать битый файл, потому что часть данных лежит в WAL-журнале.
 
 ```bash
 sudo nano /opt/backup-dogwalks.sh
@@ -1114,46 +1110,195 @@ sudo nano /opt/backup-dogwalks.sh
 #!/usr/bin/env bash
 set -euo pipefail
 
-BACKUP_DIR=/var/backups/dog-walks
 DB=/var/lib/dog-walks/walks.db
+BACKUP_DIR=/var/backups/dog-walks
 STAMP=$(date +%Y%m%d_%H%M%S)
+FILE="$BACKUP_DIR/walks_$STAMP.db"
 
 mkdir -p "$BACKUP_DIR"
 
-# .backup — правильный способ копировать SQLite: он делает
-# согласованный снимок даже во время записи, в отличие от cp
-sqlite3 "$DB" ".backup '$BACKUP_DIR/walks_$STAMP.db'"
-gzip "$BACKUP_DIR/walks_$STAMP.db"
+# .backup корректно работает при активной записи, в отличие от cp
+sqlite3 "$DB" ".backup '$FILE'"
 
+# Проверяем, что снимок не битый, до того как на него положимся
+if ! sqlite3 "$FILE" "PRAGMA integrity_check;" | grep -q '^ok$'; then
+  echo "❌ Бэкап повреждён: $FILE" >&2
+  rm -f "$FILE"
+  exit 1
+fi
+
+COUNT=$(sqlite3 "$FILE" "SELECT COUNT(*) FROM walks;")
+gzip "$FILE"
+echo "✅ $STAMP — записей: $COUNT, файл: ${FILE}.gz"
+
+# Локально держим 30 дней
 find "$BACKUP_DIR" -name "walks_*.db.gz" -mtime +30 -delete
-echo "Бэкап готов: walks_$STAMP.db.gz"
 ```
 
 ```bash
 sudo chmod +x /opt/backup-dogwalks.sh
-sudo /opt/backup-dogwalks.sh     # проверить, что работает
+sudo /opt/backup-dogwalks.sh
+```
+
+Ожидаем строку вида `✅ 20260805_141500 — записей: 263, файл: ...`. Число записей — важная часть: если однажды оно резко упадёт, вы это заметите в логе.
+
+## 8.2. Копия в Object Storage
+
+Бэкап на том же диске не спасает от гибели диска. Уносим наружу.
+
+### Создать бакет
+
+Консоль Yandex Cloud → **Object Storage** → **Создать бакет**.
+
+- Имя: `dog-walks-backups-<что-нибудь-уникальное>` (имена глобальные на всё облако)
+- Максимальный размер: 1 ГБ хватит с большим запасом
+- Доступ на чтение объектов, на список объектов, на чтение настроек: **Ограниченный**
+- Класс хранилища: **Холодное** — оно дешевле, а бэкапы читаются редко
+
+### Сервисный аккаунт и ключ
+
+Отдельная учётная запись только для загрузки бэкапов. Ваши личные права в неё не попадают.
+
+1. **Identity and Access Management** → **Сервисные аккаунты** → **Создать**
+   - Имя: `dog-walks-backup`
+   - Роль: `storage.uploader` — умеет только загружать объекты, ни читать, ни удалять
+2. Откройте созданный аккаунт → **Создать новый ключ** → **Статический ключ доступа**
+3. Скопируйте **идентификатор** и **секретный ключ**. Секрет показывается один раз
+
+### Настроить s3cmd на сервере
+
+```bash
+sudo apt install s3cmd -y
+```
+
+Конфиг пишем файлом, а не через интерактивный `s3cmd --configure` — так надёжнее и повторяемо:
+
+```bash
+nano ~/.s3cfg
+```
+
+```ini
+[default]
+access_key = ВАШ_ИДЕНТИФИКАТОР_КЛЮЧА
+secret_key = ВАШ_СЕКРЕТНЫЙ_КЛЮЧ
+bucket_location = ru-central1
+host_base = storage.yandexcloud.net
+host_bucket = %(bucket)s.storage.yandexcloud.net
+use_https = True
+```
+
+Права — файл содержит секрет:
+
+```bash
+chmod 600 ~/.s3cfg
+```
+
+Проверка:
+
+```bash
+s3cmd ls s3://dog-walks-backups-ваше-имя/
+```
+
+Пустой вывод без ошибки — значит доступ есть, просто бакет пока пуст.
+
+> Роль `storage.uploader` не даёт читать список объектов, поэтому `s3cmd ls` может ответить `Access Denied`. Это нормально и даже правильно: если сервер взломают, скачать или стереть ваши бэкапы с него не смогут. Проверить содержимое бакета можно в консоли облака.
+
+### Добавить загрузку в скрипт
+
+```bash
+sudo nano /opt/backup-dogwalks.sh
+```
+
+Перед строкой с `find` вставьте:
+
+```bash
+# Копия за пределы сервера
+if s3cmd put "${FILE}.gz" "s3://dog-walks-backups-ваше-имя/" >/dev/null 2>&1; then
+  echo "☁️  Загружено в Object Storage"
+else
+  echo "⚠️  Не удалось загрузить в Object Storage" >&2
+fi
+```
+
+Загрузка намеренно не роняет скрипт: локальный бэкап уже снят и это ценнее, чем аккуратный код возврата.
+
+```bash
+sudo /opt/backup-dogwalks.sh
+```
+
+Скрипт запускается под `root` через `sudo`, а `~/.s3cfg` лежит у `ubuntu`. Чтобы `s3cmd` нашёл конфиг, укажите путь явно — замените в скрипте `s3cmd put` на:
+
+```bash
+s3cmd -c /home/ubuntu/.s3cfg put "${FILE}.gz" "s3://dog-walks-backups-ваше-имя/"
+```
+
+### Автоудаление старых копий
+
+Чтобы бакет не рос бесконечно: бакет → **Жизненный цикл** → **Создать правило**.
+
+- Действие: удалять объекты старше **90** дней
+
+Так вы не платите за копии, которые уже никогда не понадобятся.
+
+## 8.3. Расписание
+
+```bash
 sudo crontab -e
 ```
 
-Добавьте строку — каждый день в 03:00:
+Если спросит редактор, выберите `nano` (вариант 1). Добавьте строку в конец:
 
 ```
 0 3 * * * /opt/backup-dogwalks.sh >> /var/log/dogwalks-backup.log 2>&1
 ```
 
-## 8.2. Копия за пределы сервера
+Пять полей — минута, час, день месяца, месяц, день недели. `0 3 * * *` означает «каждый день в 03:00». `>>` дописывает вывод в лог, `2>&1` направляет туда же ошибки.
 
-Бэкап на том же диске не спасает от гибели диска. Минимально рабочий вариант — тянуть копию к себе. На своей машине:
+Через сутки проверьте, что отработало:
+
+```bash
+tail -5 /var/log/dogwalks-backup.log
+ls -lh /var/backups/dog-walks/
+```
+
+## 8.4. Проверить восстановление
+
+Бэкап, из которого ни разу не восстанавливались, — это не бэкап, а надежда. Проверяем на копии, не трогая рабочую базу:
+
+```bash
+cd /tmp
+gunzip -c /var/backups/dog-walks/$(ls -t /var/backups/dog-walks/ | head -1) > /tmp/test-restore.db
+sqlite3 /tmp/test-restore.db "SELECT COUNT(*) FROM walks;"
+sqlite3 /tmp/test-restore.db "SELECT * FROM walks ORDER BY walk_date DESC LIMIT 3;"
+rm /tmp/test-restore.db
+```
+
+Число записей должно совпадать с боевым, а последние строки — содержать свежие прогулки.
+
+**Реальное восстановление**, если однажды понадобится:
+
+```bash
+pm2 stop dog-walks-backend
+cp /var/lib/dog-walks/walks.db /var/lib/dog-walks/walks.db.broken   # на всякий случай
+gunzip -c /var/backups/dog-walks/walks_ГГГГММДД_ЧЧММСС.db.gz > /var/lib/dog-walks/walks.db
+sqlite3 /var/lib/dog-walks/walks.db "PRAGMA integrity_check;"
+pm2 start dog-walks-backend
+curl -s http://localhost:3000/api/health; echo
+```
+
+## 8.5. Копия к себе на машину
+
+Третий уровень, если хочется совсем спокойно. На **своей** машине:
 
 ```bash
 crontab -e
 ```
 
 ```
-0 10 * * * scp dogwalks:/var/backups/dog-walks/$(date +\%Y\%m\%d)*.gz ~/dog-walks-backups/ 2>/dev/null
+0 10 * * * /usr/bin/scp dogwalks:/var/backups/dog-walks/$(date +\%Y\%m\%d)*.gz ~/dog-walks-backups/ >/dev/null 2>&1
 ```
 
-Правильнее — заливать в Yandex Object Storage через сервисный аккаунт. Настроим отдельно, когда автодеплой заработает; сейчас важнее, чтобы бэкапы просто появились.
+Знаки `%` в cron экранируются обратным слэшем — без этого строка обрежется. Скачивание сработает, только когда компьютер включён, поэтому это дополнение к первым двум уровням, а не замена.
 
 ---
 
