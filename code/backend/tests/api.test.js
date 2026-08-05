@@ -1,3 +1,6 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import { openDb } from '../src/db.js';
@@ -159,5 +162,24 @@ describe('миграции', () => {
 
     const columns = db.pragma('table_info(walks)');
     expect(columns.some((c) => c.name === 'comments')).toBe(true);
+  });
+});
+
+describe('openDb', () => {
+  it('создаёт папку под файл базы, если её нет', () => {
+    // Git не хранит пустые директории, поэтому после клонирования
+    // ./database/ отсутствует — приложение должно создать её само
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dogwalks-'));
+    const nested = path.join(dir, 'database', 'walks.db');
+
+    expect(fs.existsSync(path.dirname(nested))).toBe(false);
+
+    const db = openDb(nested);
+    migrate(db);
+    db.close();
+
+    expect(fs.existsSync(nested)).toBe(true);
+
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });

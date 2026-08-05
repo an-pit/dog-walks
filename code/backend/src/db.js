@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import Database from 'better-sqlite3';
 
 /**
@@ -7,6 +9,14 @@ import Database from 'better-sqlite3';
  * в тестах: каждый тест получает чистую базу и не трогает реальные данные.
  */
 export function openDb(dbPath) {
+  if (dbPath !== ':memory:') {
+    // better-sqlite3 создаёт файл базы, но не создаёт папку под него.
+    // Git не хранит пустые директории, поэтому после свежего клона
+    // ./database/ отсутствует и приложение падало бы при старте.
+    const dir = path.dirname(dbPath);
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
   const db = new Database(dbPath);
 
   // WAL (write-ahead logging) позволяет читать из базы одновременно с записью,
