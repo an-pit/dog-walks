@@ -117,6 +117,13 @@
   color: white;
 }
 
+/* Подсветка пресета, совпадающего с текущим значением поля */
+.duration-presets button.preset-active {
+  background: #3498db;
+  color: white;
+  font-weight: 600;
+}
+
 .modal-actions {
   display: flex;
   gap: 10px;
