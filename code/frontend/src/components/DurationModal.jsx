@@ -1,21 +1,46 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import './DurationModal.css'
 
-function DurationModal({ isOpen, onClose, onSave, currentDuration = 0, currentComments = '', slotLabel, dateLabel }) {
-  const [duration, setDuration] = useState(currentDuration)
-  const [comments, setComments] = useState(currentComments)
+const PRESETS = [15, 30, 45, 60]
+
+function DurationModal({
+  isOpen,
+  onClose,
+  onSave,
+  currentDuration = 0,
+  currentComments = '',
+  slotLabel,
+  dateLabel,
+}) {
+  // Длительность храним строкой, а не числом: так поле может быть пустым.
+  // Ноль показывать не нужно — вместо него подсказка в placeholder.
+  const [duration, setDuration] = useState('')
+  const [comments, setComments] = useState('')
+
+  // Модалка не размонтируется при закрытии (ниже стоит `return null`),
+  // поэтому useState отработал бы ровно один раз и при следующем открытии
+  // показывал бы данные от прошлого слота. Синхронизируем при каждом открытии.
+  useEffect(() => {
+    if (isOpen) {
+      setDuration(currentDuration > 0 ? String(currentDuration) : '')
+      setComments(currentComments || '')
+    }
+    // Зависим только от isOpen: пропсы приходят вместе с открытием,
+    // а во время редактирования меняться не должны.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
 
   if (!isOpen) return null
 
   const handleSave = () => {
-    onSave(parseInt(duration) || 0, comments)
+    // Пустое поле означает «не засекали» — в базу пишем 0
+    onSave(parseInt(duration, 10) || 0, comments)
     onClose()
   }
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleSave()
-    }
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Escape') onClose()
   }
 
   return (
@@ -25,7 +50,7 @@ function DurationModal({ isOpen, onClose, onSave, currentDuration = 0, currentCo
         <p className="modal-info">
           {dateLabel} - {slotLabel}
         </p>
-        
+
         <div className="duration-input">
           <label htmlFor="duration">Длительность (минуты):</label>
           <input
@@ -35,18 +60,24 @@ function DurationModal({ isOpen, onClose, onSave, currentDuration = 0, currentCo
             max="480"
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="0-480 минут"
+            onKeyDown={handleKeyDown}
+            placeholder="Не указана"
             autoFocus
           />
         </div>
 
         <div className="duration-presets">
           <span>Быстрый выбор:</span>
-          <button onClick={() => setDuration(15)}>15 мин</button>
-          <button onClick={() => setDuration(30)}>30 мин</button>
-          <button onClick={() => setDuration(45)}>45 мин</button>
-          <button onClick={() => setDuration(60)}>60 мин</button>
+          {PRESETS.map((value) => (
+            <button
+              key={value}
+              type="button"
+              className={parseInt(duration, 10) === value ? 'preset-active' : ''}
+              onClick={() => setDuration(String(value))}
+            >
+              {value} мин
+            </button>
+          ))}
         </div>
 
         <div className="comments-input">
@@ -62,10 +93,10 @@ function DurationModal({ isOpen, onClose, onSave, currentDuration = 0, currentCo
         </div>
 
         <div className="modal-actions">
-          <button className="cancel-btn" onClick={onClose}>
+          <button className="cancel-btn" type="button" onClick={onClose}>
             Отмена
           </button>
-          <button className="save-btn" onClick={handleSave}>
+          <button className="save-btn" type="button" onClick={handleSave}>
             Сохранить
           </button>
         </div>
