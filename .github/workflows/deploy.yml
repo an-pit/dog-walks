@@ -1,0 +1,52 @@
+name: Deploy
+
+# Запускается только при попадании кода в main —
+# то есть после вливания PR, прошедшего CI.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  # Тесты прогоняются заново, уже на слитом состоянии main.
+  # Зелёный CI на ветке не гарантирует, что после merge всё цело.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Тесты бэкенда
+        working-directory: code/backend
+        run: npm ci && npm test
+
+  deploy:
+    needs: test          # без зелёных тестов деплой не начнётся
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Настроить SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Записываем отпечаток сервера, иначе ssh спросит подтверждение
+          # и зависнет — в автоматике отвечать некому
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Выкатить
+        run: |
+          ssh -i ~/.ssh/id_ed25519 \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              'bash -s' < scripts/deploy.sh
+
+      # Проверяем снаружи, через nginx: ловит случаи, когда бэкенд жив,
+      # а проксирование настроено криво
+      - name: Проверить снаружи
+        run: |
+          curl -fsS --max-time 10 http://${{ secrets.DEPLOY_HOST }}/api/health \
+            | tee /dev/stderr \
+            | grep -q '"status":"ok"'
