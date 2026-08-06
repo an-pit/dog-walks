@@ -176,6 +176,7 @@ git branch -d feature/название
 
 | Документ | О чём |
 |---|---|
+| [docs/CHEATSHEET.md](docs/CHEATSHEET.md) | **Шпаргалка: все команды на каждый день** |
 | [docs/AUDIT-AND-ROADMAP.md](docs/AUDIT-AND-ROADMAP.md) | Аудит уязвимостей и план работ по фазам |
 | [docs/PHASE-0-RUNBOOK.md](docs/PHASE-0-RUNBOOK.md) | Аварийные меры: ротация ключей, закрытие API |
 | [docs/PHASE-1-2-RUNBOOK.md](docs/PHASE-1-2-RUNBOOK.md) | Процесс разработки, тесты, CI, автодеплой, бэкапы |

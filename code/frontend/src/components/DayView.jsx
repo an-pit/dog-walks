@@ -30,12 +30,13 @@ function DayView() {
     setError('')
     try {
       const data = await api.getWalks(dateStr, dateStr)
-      
+
       const walksMap = {}
       data.forEach(walk => {
         walksMap[walk.slot] = walk.person
         walksMap[`${walk.slot}_duration`] = walk.duration || 0
         walksMap[`${walk.slot}_comments`] = walk.comments || ''
+        walksMap[`${walk.slot}_poop`] = walk.poop ?? null
       })
       
       setWalks(walksMap)
@@ -51,17 +52,23 @@ function DayView() {
     setModalOpen(true)
   }
 
-  const handleSaveDuration = async (duration, comments) => {
+  const handleSaveDuration = async ({ duration, comments, poop }) => {
     const currentPerson = walks[currentSlot] || 'none'
-    
+
     try {
-      await api.updateWalk(dateStr, currentSlot, currentPerson, duration, comments)
-      
+      await api.updateWalk(dateStr, currentSlot, {
+        person: currentPerson,
+        duration,
+        comments,
+        poop,
+      })
+
       setWalks(prev => ({
         ...prev,
         [currentSlot]: currentPerson,
         [`${currentSlot}_duration`]: duration,
-        [`${currentSlot}_comments`]: comments
+        [`${currentSlot}_comments`]: comments,
+        [`${currentSlot}_poop`]: poop
       }))
     } catch (err) {
       setError(err.message)
@@ -75,10 +82,14 @@ function DayView() {
     const nextPerson = PERSON_ORDER[nextIndex]
 
     try {
-      const currentDuration = walks[`${slot}_duration`] || 0
-      const currentComments = walks[`${slot}_comments`] || ''
-      await api.updateWalk(dateStr, slot, nextPerson, currentDuration, currentComments)
-      
+      // Смена человека не должна затирать остальные поля слота
+      await api.updateWalk(dateStr, slot, {
+        person: nextPerson,
+        duration: walks[`${slot}_duration`] || 0,
+        comments: walks[`${slot}_comments`] || '',
+        poop: walks[`${slot}_poop`] ?? null,
+      })
+
       setWalks(prev => ({
         ...prev,
         [slot]: nextPerson
@@ -201,6 +212,7 @@ function DayView() {
         onSave={handleSaveDuration}
         currentDuration={walks[`${currentSlot}_duration`] || 0}
         currentComments={walks[`${currentSlot}_comments`] || ''}
+        currentPoop={walks[`${currentSlot}_poop`] ?? null}
         slotLabel={SLOTS[currentSlot]}
         dateLabel={currentDate.toLocaleDateString('ru-RU', {
           weekday: 'long',

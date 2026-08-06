@@ -11,20 +11,22 @@ export const api = {
     return await response.json()
   },
 
-  // Обновить прогулку
-  async updateWalk(date, slot, person, duration = 0, comments = '') {
+  // Обновить прогулку.
+  // Детали передаются объектом, а не позиционными аргументами: полей уже
+  // четыре, и при добавлении следующего не придётся править все вызовы.
+  async updateWalk(date, slot, { person, duration = 0, comments = '', poop = null }) {
     const response = await fetch(`${API_BASE}/walks/${date}/${slot}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ person, duration, comments })
+      body: JSON.stringify({ person, duration, comments, poop })
     })
-    
+
     if (!response.ok) {
       throw new Error(`Ошибка обновления: ${response.status}`)
     }
-    
+
     return await response.json()
   },
 
@@ -149,6 +151,27 @@ export const PERSONS = {
   andrey: { label: 'Андрей', color: '#3498db', emoji: '🔵' },
   ira: { label: 'Ира', color: '#9b59b6', emoji: '🟣' },
   both: { label: 'Оба', color: '#2ecc71', emoji: '🟢' }
+}
+
+// Отметка о туалете. null — не отмечено, и это не то же самое, что «нет»:
+// «не проверяли» и «проверили, не было» — разные факты.
+export const POOP = {
+  null: { label: 'Не отмечено', short: 'не отмечено', emoji: '⚪' },
+  yes: { label: 'Покакал', short: 'покакал', emoji: '💩' },
+  no: { label: 'Не покакал', short: 'не покакал', emoji: '🚫' }
+}
+
+// Порядок перебора по кругу — как у смены человека
+export const POOP_ORDER = [null, 'yes', 'no']
+
+export function poopInfo(value) {
+  return POOP[value === null || value === undefined ? 'null' : value] || POOP.null
+}
+
+export function nextPoop(value) {
+  const current = value === undefined ? null : value
+  const index = POOP_ORDER.indexOf(current)
+  return POOP_ORDER[(index + 1) % POOP_ORDER.length]
 }
 
 export const PERSON_ORDER = ['none', 'andrey', 'ira', 'both']

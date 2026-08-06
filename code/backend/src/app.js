@@ -5,6 +5,11 @@ const SLOTS = ['morning', 'afternoon', 'evening'];
 const PERSONS = ['andrey', 'ira', 'both', 'none'];
 const MAX_DURATION = 480;
 
+// Отметка о туалете: null — не отмечено, 'yes' — покакал, 'no' — не покакал.
+// null и 'no' различаются намеренно: «не проверяли» и «проверили, не было» —
+// разные факты, и смешивать их в статистике нельзя.
+const POOP_VALUES = [null, 'yes', 'no'];
+
 // Валидация даты
 function isValidDate(dateString) {
   const regex = /^\d{4}-\d{2}-\d{2}$/;
@@ -75,7 +80,7 @@ export function createApp(db) {
   app.put('/api/walks/:date/:slot', (req, res) => {
     try {
       const { date, slot } = req.params;
-      const { person, duration = 0, comments = '' } = req.body;
+      const { person, duration = 0, comments = '', poop = null } = req.body;
 
       if (!isValidDate(date)) {
         return res.status(400).json({ error: 'Неверный формат даты. Используйте YYYY-MM-DD' });
@@ -100,18 +105,26 @@ export function createApp(db) {
           .json({ error: `Длительность должна быть числом от 0 до ${MAX_DURATION} минут` });
       }
 
+      const poopValue = poop === undefined ? null : poop;
+      if (!POOP_VALUES.includes(poopValue)) {
+        return res
+          .status(400)
+          .json({ error: 'Неверное значение poop. Допустимые значения: null, yes, no' });
+      }
+
       const result = db
         .prepare(
-          `INSERT INTO walks (walk_date, slot, person, duration, comments)
-           VALUES (?, ?, ?, ?, ?)
+          `INSERT INTO walks (walk_date, slot, person, duration, comments, poop)
+           VALUES (?, ?, ?, ?, ?, ?)
            ON CONFLICT(walk_date, slot)
            DO UPDATE SET
              person = excluded.person,
              duration = excluded.duration,
              comments = excluded.comments,
+             poop = excluded.poop,
              updated_at = CURRENT_TIMESTAMP`
         )
-        .run(date, slot, person, durationNum, comments);
+        .run(date, slot, person, durationNum, comments, poopValue);
 
       res.json({
         success: true,
@@ -152,6 +165,12 @@ export function createApp(db) {
         totalDuration: 0,
         andreyDuration: 0,
         iraDuration: 0,
+        // Отметки о туалете. poopMarked — сколько прогулок вообще отмечено,
+        // чтобы можно было честно считать долю: «покакал в 12 из 15 отмеченных»,
+        // а не «в 12 из 280», где 265 записей просто не заполнялись.
+        poopYes: 0,
+        poopNo: 0,
+        poopMarked: 0,
       };
 
       walks.forEach((walk) => {
@@ -171,6 +190,15 @@ export function createApp(db) {
           stats.ira++;
           stats.andreyDuration += duration;
           stats.iraDuration += duration;
+        }
+
+        if (walk.poop === 'yes') {
+          stats.poopYes++;
+          stats.poopMarked++;
+        }
+        if (walk.poop === 'no') {
+          stats.poopNo++;
+          stats.poopMarked++;
         }
       });
 
@@ -208,12 +236,15 @@ export function createApp(db) {
 
       const personMap = { andrey: 'Андрей', ira: 'Ира', both: 'Оба', none: 'Никто' };
       const slotMap = { morning: 'Утро', afternoon: 'День', evening: 'Вечер' };
+      const poopMap = { yes: 'Да', no: 'Нет' };
 
-      let csv = 'Дата,Слот,Кто гулял,Длительность (мин),Комментарий\n';
+      let csv = 'Дата,Слот,Кто гулял,Длительность (мин),Туалет,Комментарий\n';
 
       walks.forEach((walk) => {
         const escapedComments = (walk.comments || '').replace(/"/g, '""').replace(/,/g, ';');
-        csv += `${walk.walk_date},${slotMap[walk.slot]},${personMap[walk.person]},${walk.duration || 0},"${escapedComments}"\n`;
+        // Не отмеченные прогулки остаются пустой ячейкой, а не «Нет»
+        const poopLabel = poopMap[walk.poop] || '';
+        csv += `${walk.walk_date},${slotMap[walk.slot]},${personMap[walk.person]},${walk.duration || 0},${poopLabel},"${escapedComments}"\n`;
       });
 
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
