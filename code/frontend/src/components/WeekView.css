@@ -1,45 +1,34 @@
-.week-view {
-  background: white;
-  border-radius: 10px;
-  padding: 20px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+/* Цвет ячейки и цвет текста меняются вместе */
+.slot-cell.andrey { background: var(--andrey); color: var(--andrey-text); }
+.slot-cell.ira    { background: var(--ira);    color: var(--ira-text); }
+.slot-cell.both   { background: var(--both);   color: var(--both-text); }
+.slot-cell.none   { background: var(--none);   color: var(--none-text); }
+
+/* Горизонтальная прокрутка живёт здесь, а не на всей карточке:
+   благодаря этому навигация по неделям остаётся на экране */
+.week-grid-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Полоса прокрутки не должна наезжать на последнюю строку */
+  padding-bottom: var(--space-1);
 }
 
-.week-navigation {
+/* Иконки признаков в ячейке: туалет и наличие комментария */
+.cell-marks {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #eee;
-}
-
-.week-navigation h2 {
-  color: #2c3e50;
-  margin: 0;
-}
-
-.week-navigation button {
-  padding: 8px 16px;
-  border: 1px solid #3498db;
-  background: white;
-  color: #3498db;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.week-navigation button:hover {
-  background: #3498db;
-  color: white;
+  justify-content: center;
+  gap: 2px;
+  font-size: 10px;
+  line-height: 1;
 }
 
 .week-grid {
   display: grid;
   grid-template-columns: 120px repeat(7, 1fr);
   gap: 1px;
-  background: #eee;
-  border: 1px solid #eee;
+  /* Фон просвечивает в зазорах и рисует линии сетки */
+  background: var(--border);
+  border: 1px solid var(--border);
 }
 
 .grid-header {
@@ -47,11 +36,11 @@
 }
 
 .time-header, .day-header {
-  background: #2c3e50;
-  color: white;
-  padding: 15px 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  padding: var(--space-3) var(--space-2);
   text-align: center;
-  font-weight: bold;
+  font-weight: var(--weight-semibold);
 }
 
 .day-header {
@@ -74,18 +63,22 @@
 }
 
 .slot-label {
-  background: #34495e;
-  color: white;
-  padding: 20px 10px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  padding: var(--space-4) var(--space-2);
   text-align: center;
-  font-weight: bold;
+  font-weight: var(--weight-medium);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .slot-cell {
-  background: white;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  background: var(--surface);
   padding: 15px 10px;
   text-align: center;
   transition: all 0.2s;
@@ -96,6 +89,10 @@
   gap: 5px;
   min-height: 100px;
   position: relative;
+}
+
+.slot-cell:active {
+  transform: scale(0.97);
 }
 
 .slot-cell:hover {
@@ -116,20 +113,6 @@
   font-size: 20px;
 }
 
-.duration-btn, .person-change-btn {
-  background: rgba(255, 255, 255, 0.8);
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 12px;
-  padding: 2px 4px;
-  transition: background 0.2s;
-}
-
-.duration-btn:hover, .person-change-btn:hover {
-  background: rgba(255, 255, 255, 1);
-}
-
 .person-label {
   font-size: 12px;
   font-weight: 500;
@@ -146,8 +129,9 @@
 /* Адаптивность */
 @media (max-width: 768px) {
   .week-view {
-    padding: 10px;
-    overflow-x: auto;
+    padding: var(--space-3);
+    /* Прокрутку забрал .week-grid-scroll — здесь она только мешала бы */
+    overflow-x: visible;
   }
   
   .week-grid {
@@ -189,34 +173,6 @@
     padding: 1px 3px;
   }
   
-  .duration-btn, .person-change-btn {
-    font-size: 10px;
-    padding: 1px 3px;
-  }
-  
-  .week-navigation {
-    flex-direction: column;
-    gap: 10px;
-    text-align: center;
-  }
-  
-  .week-navigation button {
-    width: 100%;
-    padding: 6px 12px;
-    font-size: 14px;
-  }
-  
-  .day-header {
-    padding: 8px 5px;
-  }
-  
-  .weekday {
-    font-size: 10px;
-  }
-  
-  .date {
-    font-size: 14px;
-  }
 }
 
 /* Для очень маленьких экранов */

@@ -1,3 +1,127 @@
+/*
+ * Токены дизайна.
+ *
+ * Все размеры, цвета и скругления задаются здесь и только здесь.
+ * Компоненты ссылаются на переменные, а не пишут значения руками —
+ * поэтому поменять, скажем, радиус скругления во всём приложении
+ * можно правкой одной строки.
+ *
+ * Шкала отступов кратна 4 px, как в системных гайдлайнах Apple:
+ * глазу проще, когда расстояния берутся из ограниченного набора,
+ * а не подбираются на месте.
+ */
+:root {
+  /* Отступы */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Скругления */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  /* Типографика */
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* Цвета поверхностей и текста */
+  --bg: #f2f2f7;
+  --surface: #ffffff;
+  --surface-2: #f7f7fa;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+
+  --text: #1c1c1e;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #a1a1a6;
+
+  /* Акценты. Названы по смыслу, а не по цвету:
+     поменять палитру можно, не переписывая компоненты */
+  --accent: #007aff;
+  --accent-hover: #0062cc;
+  --danger: #ff3b30;
+  --warning: #ff9500;
+
+  /* Цвета участников. К каждому фону сразу задан цвет текста —
+     иначе на светлой плашке «Никто» белые буквы становятся нечитаемыми.
+     Пара «фон + текст» всегда меняется вместе. */
+  --andrey: #007aff;
+  --andrey-text: #ffffff;
+  --ira: #af52de;
+  --ira-text: #ffffff;
+  --both: #34c759;
+  --both-text: #ffffff;
+  --none: #e5e5ea;
+  --none-text: #3a3a3c;
+
+  /* Подложка значков внутри карточки: на цветной — светлая,
+     на серой «Никто» — тёмная, иначе значка не видно */
+  --badge-on-color: rgba(255, 255, 255, 0.22);
+  --badge-on-none: rgba(0, 0, 0, 0.07);
+
+  /* Тени — мягкие и короткие, как в iOS */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  /* Прочее */
+  --transition: 0.2s ease;
+  --tap-target: 44px; /* минимальный размер кнопки для пальца */
+}
+
+/* Тёмная тема включается автоматически по настройке системы */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --surface: #1c1c1e;
+    --surface-2: #2c2c2e;
+    --border: rgba(255, 255, 255, 0.12);
+    --border-strong: rgba(255, 255, 255, 0.24);
+
+    --text: #f2f2f7;
+    --text-secondary: #98989d;
+    --text-tertiary: #636366;
+
+    --accent: #0a84ff;
+    --accent-hover: #409cff;
+    --danger: #ff453a;
+    --warning: #ff9f0a;
+
+    --andrey: #0a84ff;
+    --andrey-text: #ffffff;
+    --ira: #bf5af2;
+    --ira-text: #ffffff;
+    --both: #30d158;
+    --both-text: #ffffff;
+    /* В тёмной теме «Никто» становится тёмно-серым, а текст — светлым */
+    --none: #3a3a3c;
+    --none-text: #f2f2f7;
+
+    --badge-on-color: rgba(255, 255, 255, 0.2);
+    --badge-on-none: rgba(255, 255, 255, 0.12);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -5,68 +129,204 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  line-height: 1.6;
-  color: #333;
-  background-color: #f5f5f5;
+  font-family: var(--font);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--text);
+  background-color: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  /* Числа одинаковой ширины — таблицы и счётчики не «прыгают» */
+  font-variant-numeric: tabular-nums;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
 }
 
 .container {
-  max-width: 1200px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 20px;
+  padding: var(--space-5);
 }
+
+/* ── Шапка ───────────────────────────────────────────── */
 
 .header {
   text-align: center;
-  margin-bottom: 30px;
-  padding: 20px;
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  margin-bottom: var(--space-5);
+  padding: var(--space-5);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 .header h1 {
-  color: #2c3e50;
-  margin-bottom: 10px;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.02em;
+  color: var(--text);
 }
 
+.header p {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* ── Переключение вкладок ────────────────────────────── */
+
+/* Сегментированный контрол вместо трёх отдельных кнопок:
+   компактнее и понятнее показывает, что вариантов ровно три */
 .nav {
   display: flex;
-  justify-content: center;
-  gap: 20px;
-  margin-bottom: 30px;
+  gap: var(--space-1);
+  margin-bottom: var(--space-5);
+  padding: var(--space-1);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
 }
 
 .nav button {
-  padding: 10px 20px;
+  flex: 1;
+  padding: var(--space-2) var(--space-4);
   border: none;
-  border-radius: 5px;
-  background: #3498db;
-  color: white;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: var(--weight-medium);
   cursor: pointer;
-  transition: background 0.3s;
+  transition: background var(--transition), color var(--transition);
 }
 
 .nav button:hover {
-  background: #2980b9;
+  color: var(--text);
 }
 
 .nav button.active {
-  background: #2c3e50;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
 }
+
+/* ── Общие блоки ─────────────────────────────────────── */
+
+/* Карточка-подложка для любого экрана */
+.view-card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Навигация по периодам. Одна на все вкладки: раньше «Неделя»
+   и «День» рисовали её по-своему, и кнопки отличались */
+.view-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.view-nav h2 {
+  flex: 1;
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.view-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-target);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--accent);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition), color var(--transition);
+}
+
+.view-nav button:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ── Мобильная версия ────────────────────────────────── */
 
 @media (max-width: 768px) {
   .container {
-    padding: 10px;
+    padding: var(--space-3);
   }
-  
+
+  /* Шапка ужимается в одну строку: на телефоне вертикальное место
+     дороже, чем на десктопе, и заголовок не должен съедать экран */
+  .header {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+  }
+
+  .header h1 {
+    font-size: var(--text-lg);
+  }
+
+  /* Подзаголовок на телефоне не нужен — он ничего не добавляет */
+  .header p {
+    display: none;
+  }
+
+  /* Вкладки остаются в строку, а не растягиваются в столбец */
   .nav {
-    flex-direction: column;
-    gap: 10px;
+    margin-bottom: var(--space-3);
   }
-  
+
   .nav button {
-    width: 100%;
+    padding: var(--space-2) var(--space-1);
+    font-size: var(--text-sm);
+  }
+
+  .view-card {
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+  }
+
+  /* Стрелки навигации сжимаются до квадратных кнопок, а подпись
+     периода занимает всё оставшееся место */
+  .view-nav {
+    gap: var(--space-1);
+    margin-bottom: var(--space-4);
+  }
+
+  .view-nav button {
+    padding: var(--space-2);
+    min-width: var(--tap-target);
+    font-size: var(--text-lg);
+  }
+
+  /* На телефоне у кнопок остаются только стрелки: подписи вроде
+     «Предыдущий день» съедали бы всю строку. Смысл не теряется —
+     полный текст лежит в title */
+  .nav-text {
+    display: none;
+  }
+
+  .view-nav h2 {
+    font-size: var(--text-base);
   }
 }

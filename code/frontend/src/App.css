@@ -6,11 +6,11 @@
   text-align: center;
   padding: 40px;
   font-size: 18px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .error {
-  background: #e74c3c;
+  background: var(--danger);
   color: white;
   padding: 15px;
   border-radius: 5px;
@@ -19,7 +19,7 @@
 }
 
 .success {
-  background: #27ae60;
+  background: var(--both);
   color: white;
   padding: 15px;
   border-radius: 5px;

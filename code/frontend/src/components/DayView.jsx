@@ -4,11 +4,11 @@ import {
   dateUtils,
   formatMinutes,
   summarize,
+  poopInfo,
   SLOTS,
   PERSONS,
-  PERSON_ORDER,
 } from '../services/api'
-import DurationModal from './DurationModal'
+import SlotEditor from './SlotEditor'
 import './DayView.css'
 
 function DayView() {
@@ -47,55 +47,39 @@ function DayView() {
     }
   }
 
-  const handleDurationClick = (slot) => {
+  const openEditor = (slot) => {
     setCurrentSlot(slot)
     setModalOpen(true)
   }
 
-  const handleSaveDuration = async ({ duration, comments, poop }) => {
-    const currentPerson = walks[currentSlot] || 'none'
+  const slotValue = (slot) => ({
+    person: walks[slot] || 'none',
+    duration: walks[`${slot}_duration`] || 0,
+    comments: walks[`${slot}_comments`] || '',
+    poop: walks[`${slot}_poop`] ?? null,
+  })
+
+  // Сохранение мгновенное: панель шлёт только изменившееся поле,
+  // остальное подставляем из текущего состояния слота
+  const handlePatch = async (patch) => {
+    const slot = currentSlot
+    const next = { ...slotValue(slot), ...patch }
+
+    // Сначала показываем результат, потом отправляем: интерфейс
+    // не должен ждать сеть на каждое нажатие
+    setWalks((prev) => ({
+      ...prev,
+      [slot]: next.person,
+      [`${slot}_duration`]: next.duration,
+      [`${slot}_comments`]: next.comments,
+      [`${slot}_poop`]: next.poop,
+    }))
 
     try {
-      await api.updateWalk(dateStr, currentSlot, {
-        person: currentPerson,
-        duration,
-        comments,
-        poop,
-      })
-
-      setWalks(prev => ({
-        ...prev,
-        [currentSlot]: currentPerson,
-        [`${currentSlot}_duration`]: duration,
-        [`${currentSlot}_comments`]: comments,
-        [`${currentSlot}_poop`]: poop
-      }))
+      await api.updateWalk(dateStr, slot, next)
     } catch (err) {
       setError(err.message)
-    }
-  }
-
-  const handlePersonChange = async (slot) => {
-    const currentPerson = walks[slot] || 'none'
-    const currentIndex = PERSON_ORDER.indexOf(currentPerson)
-    const nextIndex = (currentIndex + 1) % PERSON_ORDER.length
-    const nextPerson = PERSON_ORDER[nextIndex]
-
-    try {
-      // Смена человека не должна затирать остальные поля слота
-      await api.updateWalk(dateStr, slot, {
-        person: nextPerson,
-        duration: walks[`${slot}_duration`] || 0,
-        comments: walks[`${slot}_comments`] || '',
-        poop: walks[`${slot}_poop`] ?? null,
-      })
-
-      setWalks(prev => ({
-        ...prev,
-        [slot]: nextPerson
-      }))
-    } catch (err) {
-      setError(err.message)
+      loadWalks()
     }
   }
 
@@ -119,9 +103,11 @@ function DayView() {
   }
 
   return (
-    <div className="day-view">
-      <div className="day-navigation">
-        <button onClick={() => navigateDay(-1)}>← Вчера</button>
+    <div className="day-view view-card">
+      <div className="view-nav">
+        <button onClick={() => navigateDay(-1)} title="Предыдущий день">
+          ←<span className="nav-text"> Предыдущий день</span>
+        </button>
         <h2>
           {currentDate.toLocaleDateString('ru-RU', {
             weekday: 'long',
@@ -130,7 +116,9 @@ function DayView() {
             year: 'numeric'
           })}
         </h2>
-        <button onClick={() => navigateDay(1)}>Завтра →</button>
+        <button onClick={() => navigateDay(1)} title="Следующий день">
+          <span className="nav-text">Следующий день </span>→
+        </button>
       </div>
 
       {error && <div className="error">{error}</div>}
@@ -139,39 +127,46 @@ function DayView() {
         {Object.entries(SLOTS).map(([slotKey, slotLabel]) => {
           const person = walks[slotKey] || 'none'
           const duration = walks[`${slotKey}_duration`] || 0
+          const comments = walks[`${slotKey}_comments`] || ''
+          const poop = walks[`${slotKey}_poop`] ?? null
           const personInfo = PERSONS[person]
-          
+
           return (
-            <div
+            <button
               key={slotKey}
+              type="button"
               className={`slot-card ${person}`}
-              style={{ backgroundColor: personInfo.color }}
+              onClick={() => openEditor(slotKey)}
             >
               <div className="slot-header">
                 <span className="slot-time">{slotLabel}</span>
                 <span className="slot-emoji">{personInfo.emoji}</span>
               </div>
               <div className="slot-person">{personInfo.label}</div>
-              {duration > 0 && (
-                <div className="slot-duration">
-                  ⏱️ {duration} минут
+
+              {/* Строка признаков: показываем только заполненное,
+                  чтобы пустая карточка оставалась пустой */}
+              {(duration > 0 || poop || comments) && (
+                <div className="slot-badges">
+                  {duration > 0 && (
+                    <span className="badge" title="Длительность">
+                      ⏱️ {formatMinutes(duration)}
+                    </span>
+                  )}
+                  {poop && (
+                    <span className="badge" title={poopInfo(poop).label}>
+                      {poopInfo(poop).emoji} {poopInfo(poop).short}
+                    </span>
+                  )}
+                  {comments && (
+                    <span className="badge badge-icon" title={comments}>
+                      💬
+                    </span>
+                  )}
                 </div>
               )}
-              <div className="slot-actions">
-                <button
-                  className="duration-btn"
-                  onClick={() => handleDurationClick(slotKey)}
-                >
-                  Установить длительность
-                </button>
-                <button
-                  className="person-btn"
-                  onClick={() => handlePersonChange(slotKey)}
-                >
-                  Сменить человека
-                </button>
-              </div>
-            </div>
+              <span className="slot-edit-hint">Изменить</span>
+            </button>
           )
         })}
       </div>
@@ -206,13 +201,11 @@ function DayView() {
         </div>
       </div>
 
-      <DurationModal
+      <SlotEditor
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSave={handleSaveDuration}
-        currentDuration={walks[`${currentSlot}_duration`] || 0}
-        currentComments={walks[`${currentSlot}_comments`] || ''}
-        currentPoop={walks[`${currentSlot}_poop`] ?? null}
+        onChange={handlePatch}
+        value={currentSlot ? slotValue(currentSlot) : null}
         slotLabel={SLOTS[currentSlot]}
         dateLabel={currentDate.toLocaleDateString('ru-RU', {
           weekday: 'long',

@@ -1,0 +1,236 @@
+.editor-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  z-index: 1000;
+}
+
+.editor-sheet {
+  width: 100%;
+  max-width: 380px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-5);
+}
+
+.editor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.editor-date {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.editor-slot {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.editor-close {
+  border: none;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Участники: плитки 2×2, самая крупная цель в панели —
+   это действие выполняется чаще остальных */
+.person-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.person-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 52px;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.person-emoji {
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+/* Выбранная плитка окрашивается в цвет участника.
+   Фон и текст задаются парой, как на карточках */
+.person-tile.selected.andrey { background: var(--andrey); color: var(--andrey-text); border-color: var(--andrey); }
+.person-tile.selected.ira    { background: var(--ira);    color: var(--ira-text);    border-color: var(--ira); }
+.person-tile.selected.both   { background: var(--both);   color: var(--both-text);   border-color: var(--both); }
+.person-tile.selected.none   { background: var(--none);   color: var(--none-text);   border-color: var(--border-strong); }
+
+.editor-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.editor-value {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+.editor-link {
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  padding: var(--space-1);
+}
+
+.preset-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+/* Повторное нажатие на выбранный пресет сбрасывает длительность —
+   иначе от неверно поставленных минут было бы не избавиться */
+.preset {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.preset.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.editor-input,
+.editor-textarea {
+  width: 100%;
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-base);
+}
+
+.editor-textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.editor-input:focus,
+.editor-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.poop-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.poop-option {
+  min-height: 40px;
+  padding: var(--space-2) var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.poop-option.selected {
+  color: var(--text);
+  border-color: var(--border-strong);
+  font-weight: var(--weight-medium);
+}
+
+.poop-option.poop-yes.selected {
+  background: color-mix(in srgb, var(--both) 18%, var(--surface));
+  border-color: var(--both);
+}
+
+.poop-option.poop-no.selected {
+  background: color-mix(in srgb, var(--warning) 18%, var(--surface));
+  border-color: var(--warning);
+}
+
+.editor-add-note {
+  width: 100%;
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.editor-done {
+  width: 100%;
+  min-height: var(--tap-target);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: #fff;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+.editor-done:hover {
+  background: var(--accent-hover);
+}
+
+@media (max-width: 480px) {
+  .editor-overlay {
+    /* На телефоне панель прижимается к низу — ближе к большому пальцу */
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .editor-sheet {
+    max-width: none;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
+  }
+}
