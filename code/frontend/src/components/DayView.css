@@ -1,42 +1,3 @@
-.day-view {
-  background: white;
-  border-radius: 10px;
-  padding: 20px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-.day-navigation {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #eee;
-}
-
-.day-navigation h2 {
-  color: #2c3e50;
-  margin: 0;
-  text-align: center;
-  flex: 1;
-}
-
-.day-navigation button {
-  padding: 10px 20px;
-  border: 1px solid #3498db;
-  background: white;
-  color: #3498db;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.3s;
-  min-width: 100px;
-}
-
-.day-navigation button:hover {
-  background: #3498db;
-  color: white;
-}
-
 .slots-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -44,12 +5,25 @@
   margin-bottom: 30px;
 }
 
+/* Фон и цвет текста задаются парой: на светло-серой плашке «Никто»
+   белые буквы были нечитаемы */
+.slot-card.andrey { background: var(--andrey); color: var(--andrey-text); }
+.slot-card.ira    { background: var(--ira);    color: var(--ira-text); }
+.slot-card.both   { background: var(--both);   color: var(--both-text); }
+.slot-card.none   { background: var(--none);   color: var(--none-text); }
+
+/* Карточка целиком — кнопка: цель для пальца во всю площадь,
+   вместо двух мелких кнопок внизу */
 .slot-card {
-  border-radius: 15px;
-  padding: 25px;
-  color: white;
+  width: 100%;
+  border: none;
+  font-family: inherit;
+  text-align: center;
+  cursor: pointer;
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
   transition: all 0.3s;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -57,8 +31,25 @@
 }
 
 .slot-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.slot-card:active {
+  transform: scale(0.99);
+}
+
+/* Подсказка появляется на наведении — на карточке она нужна лишь
+   как намёк, что элемент кликабельный */
+.slot-edit-hint {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.slot-card:hover .slot-edit-hint {
+  opacity: 0.75;
 }
 
 .slot-header {
@@ -85,49 +76,49 @@
   margin: 5px 0;
 }
 
-.slot-duration {
-  font-size: 14px;
-  opacity: 0.9;
-  text-align: center;
-  margin: 5px 0;
-  background: rgba(255, 255, 255, 0.2);
-  padding: 4px 8px;
-  border-radius: 10px;
-}
-
-.slot-actions {
+/* Строка признаков под именем: длительность, туалет, комментарий.
+   Пилюли переносятся на вторую строку, если не помещаются */
+.slot-badges {
   display: flex;
-  gap: 10px;
-  margin-top: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1);
+  margin: var(--space-2) 0;
 }
 
-.duration-btn, .person-btn {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: all 0.3s;
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  background: var(--badge-on-color);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
 }
 
-.duration-btn:hover, .person-btn:hover {
-  background: rgba(255, 255, 255, 0.4);
-  transform: translateY(-1px);
+/* Комментарий показываем только иконкой — текст живёт в подсказке
+   и в модалке, на карточке он бы всё сломал */
+.badge-icon {
+  padding: var(--space-1) var(--space-2);
+  cursor: help;
+}
+
+/* На серой карточке светлая подложка значка не видна */
+.slot-card.none .badge {
+  background: var(--badge-on-none);
 }
 
 .day-summary {
-  background: #f8f9fa;
-  border-radius: 10px;
-  padding: 20px;
-  border-left: 4px solid #3498db;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  border-left: 3px solid var(--accent);
 }
 
 .day-summary h3 {
   margin: 0 0 15px 0;
-  color: #2c3e50;
+  color: var(--text);
 }
 
 .stats {
@@ -144,9 +135,9 @@
   column-gap: 10px;
   row-gap: 2px;
   padding: 12px;
-  background: white;
-  border-radius: 5px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
 }
 
 .stat-emoji {
@@ -156,42 +147,34 @@
 
 .stat-name {
   font-size: 13px;
-  color: #7f8c8d;
+  color: var(--text-secondary);
 }
 
 .stat-value {
   grid-column: 2;
   font-size: 18px;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--text);
   line-height: 1.2;
 }
 
 .stat-unit {
   font-size: 13px;
   font-weight: 400;
-  color: #7f8c8d;
+  color: var(--text-secondary);
 }
 
 .stat-minutes {
   grid-column: 2;
   font-size: 14px;
-  color: #3498db;
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
 
 /* Адаптивность */
 @media (max-width: 768px) {
-  .day-navigation {
-    flex-direction: column;
-    gap: 15px;
-    text-align: center;
-  }
-  
-  .day-navigation button {
-    width: 100%;
-  }
-  
+    
+    
   .slots-grid {
     grid-template-columns: 1fr;
   }

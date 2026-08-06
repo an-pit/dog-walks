@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { api, dateUtils, SLOTS, PERSONS, PERSON_ORDER } from '../services/api'
-import DurationModal from './DurationModal'
+import { api, dateUtils, poopInfo, SLOTS, PERSONS } from '../services/api'
+import SlotEditor from './SlotEditor'
 import './WeekView.css'
 
 function WeekView() {
@@ -46,64 +46,40 @@ function WeekView() {
     }
   }
 
-  const handleSlotClick = (date, slot) => {
+  const openEditor = (date, slot) => {
     setCurrentDate(date)
     setCurrentSlot(slot)
     setModalOpen(true)
   }
 
-  const handleSaveDuration = async ({ duration, comments, poop }) => {
-    const currentPerson = walks[currentDate]?.[currentSlot] || 'none'
+  const slotValue = (date, slot) => ({
+    person: walks[date]?.[slot] || 'none',
+    duration: walks[date]?.[`${slot}_duration`] || 0,
+    comments: walks[date]?.[`${slot}_comments`] || '',
+    poop: walks[date]?.[`${slot}_poop`] ?? null,
+  })
+
+  const handlePatch = async (patch) => {
+    const date = currentDate
+    const slot = currentSlot
+    const next = { ...slotValue(date, slot), ...patch }
+
+    setWalks((prev) => ({
+      ...prev,
+      [date]: {
+        ...prev[date],
+        [slot]: next.person,
+        [`${slot}_duration`]: next.duration,
+        [`${slot}_comments`]: next.comments,
+        [`${slot}_poop`]: next.poop,
+      },
+    }))
 
     try {
-      await api.updateWalk(currentDate, currentSlot, {
-        person: currentPerson,
-        duration,
-        comments,
-        poop,
-      })
-
-      // Обновляем локальное состояние
-      setWalks(prev => ({
-        ...prev,
-        [currentDate]: {
-          ...prev[currentDate],
-          [currentSlot]: currentPerson,
-          [`${currentSlot}_duration`]: duration,
-          [`${currentSlot}_comments`]: comments,
-          [`${currentSlot}_poop`]: poop
-        }
-      }))
+      await api.updateWalk(date, slot, next)
     } catch (err) {
       setError(err.message)
-    }
-  }
-
-  const handlePersonChange = async (date, slot) => {
-    const currentPerson = walks[date]?.[slot] || 'none'
-    const currentIndex = PERSON_ORDER.indexOf(currentPerson)
-    const nextIndex = (currentIndex + 1) % PERSON_ORDER.length
-    const nextPerson = PERSON_ORDER[nextIndex]
-
-    try {
-      // Смена человека не должна затирать остальные поля слота
-      await api.updateWalk(date, slot, {
-        person: nextPerson,
-        duration: walks[date]?.[`${slot}_duration`] || 0,
-        comments: walks[date]?.[`${slot}_comments`] || '',
-        poop: walks[date]?.[`${slot}_poop`] ?? null,
-      })
-
-      // Обновляем локальное состояние
-      setWalks(prev => ({
-        ...prev,
-        [date]: {
-          ...prev[date],
-          [slot]: nextPerson
-        }
-      }))
-    } catch (err) {
-      setError(err.message)
+      loadWalks()
     }
   }
 
@@ -116,19 +92,26 @@ function WeekView() {
   }
 
   return (
-    <div className="week-view">
-      <div className="week-navigation">
-        <button onClick={() => navigateWeek(-1)}>← Предыдущая неделя</button>
+    <div className="week-view view-card">
+      <div className="view-nav">
+        <button onClick={() => navigateWeek(-1)} title="Предыдущая неделя">
+          ←<span className="nav-text"> Предыдущая неделя</span>
+        </button>
         <h2>
           Неделя {weekDates[0].getDate()}-{weekDates[6].getDate()} {weekDates[0].toLocaleDateString('ru-RU', { month: 'long' })}
         </h2>
-        <button onClick={() => navigateWeek(1)}>Следующая неделя →</button>
+        <button onClick={() => navigateWeek(1)} title="Следующая неделя">
+          <span className="nav-text">Следующая неделя </span>→
+        </button>
       </div>
 
       {error && <div className="error">{error}</div>}
 
-      <div className="week-grid">
-        {/* Заголовки дней */}
+      {/* Прокручивается только таблица: навигация и заголовок
+          остаются на месте */}
+      <div className="week-grid-scroll">
+        <div className="week-grid">
+          {/* Заголовки дней */}
         <div className="grid-header">
           <div className="time-header">Время</div>
           {weekDates.map(date => (
@@ -151,58 +134,54 @@ function WeekView() {
               const dateStr = dateUtils.formatDate(date)
               const person = walks[dateStr]?.[slotKey] || 'none'
               const duration = walks[dateStr]?.[`${slotKey}_duration`] || 0
+              const comments = walks[dateStr]?.[`${slotKey}_comments`] || ''
+              const poop = walks[dateStr]?.[`${slotKey}_poop`] ?? null
               const personInfo = PERSONS[person]
-              
+
+              // Подсказка собирает всё, что не помещается в ячейку
+              const tooltip = [
+                `${dateUtils.formatDisplayDate(date)} ${slotLabel}: ${personInfo.label}`,
+                duration > 0 ? `${duration} мин` : null,
+                poop ? poopInfo(poop).label : null,
+                comments || null,
+              ]
+                .filter(Boolean)
+                .join(' • ')
+
               return (
-                <div
+                <button
                   key={`${dateStr}-${slotKey}`}
+                  type="button"
                   className={`slot-cell ${person}`}
-                  style={{ backgroundColor: personInfo.color }}
-                  title={`${dateUtils.formatDisplayDate(date)} ${slotLabel}: ${personInfo.label}${duration > 0 ? ` (${duration} мин)` : ''}`}
+                  title={tooltip}
+                  onClick={() => openEditor(dateStr, slotKey)}
                 >
-                  <div className="slot-header">
-                    <span className="emoji">{personInfo.emoji}</span>
-                    <button
-                      className="duration-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setCurrentDate(dateStr)
-                        setCurrentSlot(slotKey)
-                        setModalOpen(true)
-                      }}
-                      title="Установить длительность"
-                    >
-                      ⏱️
-                    </button>
-                  </div>
+                  <span className="emoji">{personInfo.emoji}</span>
                   <span className="person-label">{personInfo.label}</span>
                   {duration > 0 && (
                     <span className="duration-label">{duration} мин</span>
                   )}
-                  <button
-                    className="person-change-btn"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handlePersonChange(dateStr, slotKey)
-                    }}
-                    title="Сменить человека"
-                  >
-                    🔄
-                  </button>
-                </div>
+                  {/* Признаки компактно, только иконками — в ячейке
+                      недельной сетки места на подписи нет */}
+                  {(poop || comments) && (
+                    <span className="cell-marks">
+                      {poop && <span title={poopInfo(poop).label}>{poopInfo(poop).emoji}</span>}
+                      {comments && <span title={comments}>💬</span>}
+                    </span>
+                  )}
+                </button>
               )
             })}
-          </div>
-        ))}
+            </div>
+          ))}
+        </div>
       </div>
 
-      <DurationModal
+      <SlotEditor
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSave={handleSaveDuration}
-        currentDuration={walks[currentDate]?.[`${currentSlot}_duration`] || 0}
-        currentComments={walks[currentDate]?.[`${currentSlot}_comments`] || ''}
-        currentPoop={walks[currentDate]?.[`${currentSlot}_poop`] ?? null}
+        onChange={handlePatch}
+        value={currentSlot ? slotValue(currentDate, currentSlot) : null}
         slotLabel={SLOTS[currentSlot]}
         dateLabel={currentDate ? new Date(currentDate).toLocaleDateString('ru-RU') : ''}
       />

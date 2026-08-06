@@ -81,7 +81,7 @@ function StatsPage() {
   }
 
   return (
-    <div className="stats-page">
+    <div className="stats-page view-card">
       <div className="stats-header">
         <h2>📊 Статистика прогулок</h2>
         
