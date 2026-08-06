@@ -137,10 +137,13 @@
 }
 
 .stat {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
+  column-gap: 10px;
+  row-gap: 2px;
+  padding: 12px;
   background: white;
   border-radius: 5px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
@@ -148,6 +151,33 @@
 
 .stat-emoji {
   font-size: 18px;
+  grid-row: span 2;
+}
+
+.stat-name {
+  font-size: 13px;
+  color: #7f8c8d;
+}
+
+.stat-value {
+  grid-column: 2;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c3e50;
+  line-height: 1.2;
+}
+
+.stat-unit {
+  font-size: 13px;
+  font-weight: 400;
+  color: #7f8c8d;
+}
+
+.stat-minutes {
+  grid-column: 2;
+  font-size: 14px;
+  color: #3498db;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Адаптивность */

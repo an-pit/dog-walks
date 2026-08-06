@@ -1,5 +1,13 @@
-import React, { useState, useEffect } from 'react'
-import { api, dateUtils, SLOTS, PERSONS, PERSON_ORDER } from '../services/api'
+import React, { useState, useEffect, useMemo } from 'react'
+import {
+  api,
+  dateUtils,
+  formatMinutes,
+  summarize,
+  SLOTS,
+  PERSONS,
+  PERSON_ORDER,
+} from '../services/api'
 import DurationModal from './DurationModal'
 import './DayView.css'
 
@@ -84,6 +92,17 @@ function DayView() {
     setCurrentDate(dateUtils.addDays(currentDate, direction))
   }
 
+  // Итоги за день считаем из тех же слотов, что рисуем выше.
+  // Раньше здесь фильтровались все значения объекта подряд, включая
+  // ключи вида morning_duration — работало по совпадению.
+  const summary = useMemo(() => {
+    const slotWalks = Object.keys(SLOTS).map((slotKey) => ({
+      person: walks[slotKey],
+      duration: walks[`${slotKey}_duration`] || 0,
+    }))
+    return summarize(slotWalks)
+  }, [walks])
+
   if (loading) {
     return <div className="loading">Загрузка...</div>
   }
@@ -151,15 +170,27 @@ function DayView() {
         <div className="stats">
           <div className="stat">
             <span className="stat-emoji">🔵</span>
-            <span>Андрей: {Object.values(walks).filter(p => p === 'andrey').length}</span>
+            <span className="stat-name">Андрей</span>
+            <span className="stat-value">
+              {summary.andrey} <span className="stat-unit">прогулок</span>
+            </span>
+            <span className="stat-minutes">{formatMinutes(summary.andreyMinutes)}</span>
           </div>
           <div className="stat">
             <span className="stat-emoji">🟣</span>
-            <span>Ира: {Object.values(walks).filter(p => p === 'ira').length}</span>
+            <span className="stat-name">Ира</span>
+            <span className="stat-value">
+              {summary.ira} <span className="stat-unit">прогулок</span>
+            </span>
+            <span className="stat-minutes">{formatMinutes(summary.iraMinutes)}</span>
           </div>
           <div className="stat">
-            <span className="stat-emoji">🟢</span>
-            <span>Оба: {Object.values(walks).filter(p => p === 'both').length}</span>
+            <span className="stat-emoji">🐕</span>
+            <span className="stat-name">Всего</span>
+            <span className="stat-value">
+              {summary.total} <span className="stat-unit">прогулок</span>
+            </span>
+            <span className="stat-minutes">{formatMinutes(summary.totalMinutes)}</span>
           </div>
         </div>
       </div>

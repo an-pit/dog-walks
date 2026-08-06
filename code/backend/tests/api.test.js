@@ -132,6 +132,30 @@ describe('GET /api/export', () => {
     expect(res.text).toContain('Дата,Слот,Кто гулял');
     expect(res.text).toContain('Андрей');
   });
+
+  it('выгружает комментарий в отдельной колонке', async () => {
+    await request(app)
+      .put('/api/walks/2026-08-01/evening')
+      .send({ person: 'ira', duration: 30, comments: 'гуляли у реки' });
+
+    const res = await request(app).get('/api/export?from=2026-08-01&to=2026-08-01');
+    expect(res.text).toContain('Комментарий');
+    expect(res.text).toContain('гуляли у реки');
+  });
+
+  it('экранирует запятые и кавычки в комментарии, не ломая колонки', async () => {
+    await request(app)
+      .put('/api/walks/2026-08-01/morning')
+      .send({ person: 'andrey', duration: 20, comments: 'дождь, ветер и "лужи"' });
+
+    const res = await request(app).get('/api/export?from=2026-08-01&to=2026-08-01');
+    const row = res.text.split('\n').find((line) => line.startsWith('2026-08-01,Утро'));
+
+    // Запятая внутри комментария заменяется на «;», иначе она разорвала бы строку
+    expect(row).toContain('дождь; ветер');
+    // Кавычки удваиваются по правилам CSV
+    expect(row).toContain('""лужи""');
+  });
 });
 
 describe('миграции', () => {

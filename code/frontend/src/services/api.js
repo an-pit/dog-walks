@@ -93,10 +93,54 @@ export const dateUtils = {
   }
 }
 
+// Минуты в читаемый вид: 0 → «0 мин», 45 → «45 мин», 125 → «2 ч 5 мин»
+export function formatMinutes(totalMinutes) {
+  const total = Number(totalMinutes) || 0
+  if (total < 60) return `${total} мин`
+
+  const hours = Math.floor(total / 60)
+  const minutes = total % 60
+  return minutes === 0 ? `${hours} ч` : `${hours} ч ${minutes} мин`
+}
+
+/**
+ * Считает итоги по набору прогулок.
+ * Логика повторяет бэкенд: прогулка «Оба» засчитывается обоим,
+ * и её длительность тоже идёт в зачёт каждому.
+ */
+export function summarize(walks) {
+  const result = {
+    andrey: 0,
+    ira: 0,
+    total: 0,
+    andreyMinutes: 0,
+    iraMinutes: 0,
+    totalMinutes: 0,
+  }
+
+  walks.forEach(({ person, duration = 0 }) => {
+    if (!person) return
+
+    result.total++
+    result.totalMinutes += duration
+
+    if (person === 'andrey' || person === 'both') {
+      result.andrey++
+      result.andreyMinutes += duration
+    }
+    if (person === 'ira' || person === 'both') {
+      result.ira++
+      result.iraMinutes += duration
+    }
+  })
+
+  return result
+}
+
 // Константы для слотов и персонажей
 export const SLOTS = {
   morning: 'Утро',
-  afternoon: 'День', 
+  afternoon: 'День',
   evening: 'Вечер'
 }
 
