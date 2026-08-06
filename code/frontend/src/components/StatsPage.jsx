@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { api, dateUtils } from '../services/api'
+import { api, dateUtils, formatMinutes } from '../services/api'
 import './StatsPage.css'
 
 function StatsPage() {
@@ -154,7 +154,7 @@ function StatsPage() {
                 <div className="card-value">{stats.statistics.andrey}</div>
                 <div className="card-label">прогулок</div>
                 <div className="card-duration">
-                  {Math.floor(stats.statistics.andreyDuration / 60)}ч {stats.statistics.andreyDuration % 60}м
+                  {formatMinutes(stats.statistics.andreyDuration)}
                 </div>
               </div>
             </div>
@@ -166,7 +166,7 @@ function StatsPage() {
                 <div className="card-value">{stats.statistics.ira}</div>
                 <div className="card-label">прогулок</div>
                 <div className="card-duration">
-                  {Math.floor(stats.statistics.iraDuration / 60)}ч {stats.statistics.iraDuration % 60}м
+                  {formatMinutes(stats.statistics.iraDuration)}
                 </div>
               </div>
             </div>
@@ -178,7 +178,7 @@ function StatsPage() {
                 <div className="card-value">{stats.statistics.total}</div>
                 <div className="card-label">записей</div>
                 <div className="card-duration">
-                  {Math.floor(stats.statistics.totalDuration / 60)}ч {stats.statistics.totalDuration % 60}м
+                  {formatMinutes(stats.statistics.totalDuration)}
                 </div>
               </div>
             </div>
