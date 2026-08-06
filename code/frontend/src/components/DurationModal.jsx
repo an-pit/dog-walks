@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { poopInfo, nextPoop } from '../services/api'
 import './DurationModal.css'
 
 const PRESETS = [15, 30, 45, 60]
@@ -9,6 +10,7 @@ function DurationModal({
   onSave,
   currentDuration = 0,
   currentComments = '',
+  currentPoop = null,
   slotLabel,
   dateLabel,
 }) {
@@ -16,6 +18,7 @@ function DurationModal({
   // Ноль показывать не нужно — вместо него подсказка в placeholder.
   const [duration, setDuration] = useState('')
   const [comments, setComments] = useState('')
+  const [poop, setPoop] = useState(null)
 
   // Модалка не размонтируется при закрытии (ниже стоит `return null`),
   // поэтому useState отработал бы ровно один раз и при следующем открытии
@@ -24,6 +27,7 @@ function DurationModal({
     if (isOpen) {
       setDuration(currentDuration > 0 ? String(currentDuration) : '')
       setComments(currentComments || '')
+      setPoop(currentPoop ?? null)
     }
     // Зависим только от isOpen: пропсы приходят вместе с открытием,
     // а во время редактирования меняться не должны.
@@ -34,7 +38,7 @@ function DurationModal({
 
   const handleSave = () => {
     // Пустое поле означает «не засекали» — в базу пишем 0
-    onSave(parseInt(duration, 10) || 0, comments)
+    onSave({ duration: parseInt(duration, 10) || 0, comments, poop })
     onClose()
   }
 
@@ -78,6 +82,19 @@ function DurationModal({
               {value} мин
             </button>
           ))}
+        </div>
+
+        <div className="poop-input">
+          <label>Туалет:</label>
+          <button
+            type="button"
+            className={`poop-toggle poop-${poop ?? 'none'}`}
+            onClick={() => setPoop(nextPoop(poop))}
+            title="Нажимайте, чтобы переключить: не отмечено → покакал → не покакал"
+          >
+            <span className="poop-emoji">{poopInfo(poop).emoji}</span>
+            <span className="poop-label">{poopInfo(poop).label}</span>
+          </button>
         </div>
 
         <div className="comments-input">

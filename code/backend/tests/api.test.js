@@ -158,13 +158,91 @@ describe('GET /api/export', () => {
   });
 });
 
+describe('отметка о туалете', () => {
+  it('по умолчанию не отмечена', async () => {
+    await request(app).put('/api/walks/2026-08-01/morning').send({ person: 'andrey', duration: 30 });
+
+    const res = await request(app).get('/api/walks?from=2026-08-01&to=2026-08-01');
+    expect(res.body[0].poop).toBeNull();
+  });
+
+  it('сохраняет yes и no', async () => {
+    await request(app)
+      .put('/api/walks/2026-08-01/morning')
+      .send({ person: 'andrey', duration: 30, poop: 'yes' });
+    await request(app)
+      .put('/api/walks/2026-08-01/evening')
+      .send({ person: 'ira', duration: 40, poop: 'no' });
+
+    const res = await request(app).get('/api/walks?from=2026-08-01&to=2026-08-01');
+    const bySlot = Object.fromEntries(res.body.map((w) => [w.slot, w.poop]));
+
+    expect(bySlot.morning).toBe('yes');
+    expect(bySlot.evening).toBe('no');
+  });
+
+  it('позволяет вернуться в состояние «не отмечено»', async () => {
+    await request(app)
+      .put('/api/walks/2026-08-01/morning')
+      .send({ person: 'andrey', duration: 30, poop: 'yes' });
+    await request(app)
+      .put('/api/walks/2026-08-01/morning')
+      .send({ person: 'andrey', duration: 30, poop: null });
+
+    const res = await request(app).get('/api/walks?from=2026-08-01&to=2026-08-01');
+    expect(res.body[0].poop).toBeNull();
+  });
+
+  it('отклоняет посторонние значения', async () => {
+    const res = await request(app)
+      .put('/api/walks/2026-08-01/morning')
+      .send({ person: 'andrey', poop: 'может быть' });
+    expect(res.status).toBe(400);
+  });
+
+  it('считает отмеченные отдельно от неотмеченных', async () => {
+    await request(app)
+      .put('/api/walks/2026-08-01/morning')
+      .send({ person: 'andrey', duration: 30, poop: 'yes' });
+    await request(app)
+      .put('/api/walks/2026-08-01/afternoon')
+      .send({ person: 'ira', duration: 20, poop: 'no' });
+    // Третья прогулка без отметки — не должна попасть ни в yes, ни в no
+    await request(app)
+      .put('/api/walks/2026-08-01/evening')
+      .send({ person: 'andrey', duration: 40 });
+
+    const res = await request(app).get('/api/stats?from=2026-08-01&to=2026-08-01');
+    expect(res.body.statistics.poopYes).toBe(1);
+    expect(res.body.statistics.poopNo).toBe(1);
+    expect(res.body.statistics.poopMarked).toBe(2);
+    expect(res.body.statistics.total).toBe(3);
+  });
+
+  it('выгружается в CSV, неотмеченные — пустой ячейкой', async () => {
+    await request(app)
+      .put('/api/walks/2026-08-01/morning')
+      .send({ person: 'andrey', duration: 30, poop: 'yes' });
+    await request(app)
+      .put('/api/walks/2026-08-01/evening')
+      .send({ person: 'ira', duration: 40 });
+
+    const res = await request(app).get('/api/export?from=2026-08-01&to=2026-08-01');
+    const lines = res.text.split('\n');
+
+    expect(lines[0]).toContain('Туалет');
+    expect(lines.find((l) => l.startsWith('2026-08-01,Утро'))).toContain(',Да,');
+    expect(lines.find((l) => l.startsWith('2026-08-01,Вечер'))).toContain(',,');
+  });
+});
+
 describe('миграции', () => {
   it('повторный запуск ничего не ломает', () => {
     const db = openDb(':memory:');
     migrate(db);
     migrate(db);
     const version = db.pragma('user_version', { simple: true });
-    expect(version).toBe(2);
+    expect(version).toBe(3);
   });
 
   it('докатывает схему со старой версии', () => {
@@ -186,6 +264,23 @@ describe('миграции', () => {
 
     const columns = db.pragma('table_info(walks)');
     expect(columns.some((c) => c.name === 'comments')).toBe(true);
+    expect(columns.some((c) => c.name === 'poop')).toBe(true);
+  });
+
+  it('не подменяет NULL на «no» у записей, сделанных до v3', () => {
+    const db = openDb(':memory:');
+    // База на v2: есть comments, но нет poop
+    migrate(db);
+    db.exec("UPDATE walks SET poop = NULL");
+    db.prepare(
+      `INSERT INTO walks (walk_date, slot, person, duration, comments)
+       VALUES ('2026-05-01', 'morning', 'andrey', 45, 'старая запись')`
+    ).run();
+
+    migrate(db);
+
+    const row = db.prepare("SELECT poop FROM walks WHERE walk_date = '2026-05-01'").get();
+    expect(row.poop).toBeNull();
   });
 });
 

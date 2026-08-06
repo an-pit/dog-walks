@@ -35,6 +35,7 @@ function WeekView() {
         walksMap[walk.walk_date][walk.slot] = walk.person
         walksMap[walk.walk_date][`${walk.slot}_duration`] = walk.duration || 0
         walksMap[walk.walk_date][`${walk.slot}_comments`] = walk.comments || ''
+        walksMap[walk.walk_date][`${walk.slot}_poop`] = walk.poop ?? null
       })
       
       setWalks(walksMap)
@@ -51,12 +52,17 @@ function WeekView() {
     setModalOpen(true)
   }
 
-  const handleSaveDuration = async (duration, comments) => {
+  const handleSaveDuration = async ({ duration, comments, poop }) => {
     const currentPerson = walks[currentDate]?.[currentSlot] || 'none'
-    
+
     try {
-      await api.updateWalk(currentDate, currentSlot, currentPerson, duration, comments)
-      
+      await api.updateWalk(currentDate, currentSlot, {
+        person: currentPerson,
+        duration,
+        comments,
+        poop,
+      })
+
       // Обновляем локальное состояние
       setWalks(prev => ({
         ...prev,
@@ -64,7 +70,8 @@ function WeekView() {
           ...prev[currentDate],
           [currentSlot]: currentPerson,
           [`${currentSlot}_duration`]: duration,
-          [`${currentSlot}_comments`]: comments
+          [`${currentSlot}_comments`]: comments,
+          [`${currentSlot}_poop`]: poop
         }
       }))
     } catch (err) {
@@ -79,10 +86,14 @@ function WeekView() {
     const nextPerson = PERSON_ORDER[nextIndex]
 
     try {
-      const currentDuration = walks[date]?.[`${slot}_duration`] || 0
-      const currentComments = walks[date]?.[`${slot}_comments`] || ''
-      await api.updateWalk(date, slot, nextPerson, currentDuration, currentComments)
-      
+      // Смена человека не должна затирать остальные поля слота
+      await api.updateWalk(date, slot, {
+        person: nextPerson,
+        duration: walks[date]?.[`${slot}_duration`] || 0,
+        comments: walks[date]?.[`${slot}_comments`] || '',
+        poop: walks[date]?.[`${slot}_poop`] ?? null,
+      })
+
       // Обновляем локальное состояние
       setWalks(prev => ({
         ...prev,
@@ -191,6 +202,7 @@ function WeekView() {
         onSave={handleSaveDuration}
         currentDuration={walks[currentDate]?.[`${currentSlot}_duration`] || 0}
         currentComments={walks[currentDate]?.[`${currentSlot}_comments`] || ''}
+        currentPoop={walks[currentDate]?.[`${currentSlot}_poop`] ?? null}
         slotLabel={SLOTS[currentSlot]}
         dateLabel={currentDate ? new Date(currentDate).toLocaleDateString('ru-RU') : ''}
       />

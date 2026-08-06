@@ -38,6 +38,20 @@ const migrations = [
       db.exec("ALTER TABLE walks ADD COLUMN comments TEXT DEFAULT ''");
     }
   },
+
+  // v3 — отметка о туалете.
+  // Три состояния: NULL (не отмечено), 'yes', 'no'.
+  // Значение по умолчанию именно NULL, а не 'no': все записи, сделанные
+  // до этой миграции, честно остаются «неизвестно» вместо того,
+  // чтобы утверждать, будто собака ни разу не покакала.
+  (db) => {
+    const columns = db.pragma('table_info(walks)');
+    const hasPoop = columns.some((c) => c.name === 'poop');
+
+    if (!hasPoop) {
+      db.exec('ALTER TABLE walks ADD COLUMN poop TEXT DEFAULT NULL');
+    }
+  },
 ];
 
 export function migrate(db) {

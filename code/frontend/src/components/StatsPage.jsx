@@ -182,6 +182,24 @@ function StatsPage() {
                 </div>
               </div>
             </div>
+
+            <div className="summary-card poop">
+              <div className="card-emoji">💩</div>
+              <div className="card-content">
+                <div className="card-title">Покакал</div>
+                <div className="card-value">{stats.statistics.poopYes ?? 0}</div>
+                {/* Знаменатель — только отмеченные прогулки. Считать от общего
+                    числа было бы враньём: записи до появления отметки пустые */}
+                <div className="card-label">
+                  из {stats.statistics.poopMarked ?? 0} отмеченных
+                </div>
+                <div className="card-duration">
+                  {stats.statistics.poopMarked
+                    ? `${Math.round((stats.statistics.poopYes / stats.statistics.poopMarked) * 100)}%`
+                    : 'нет данных'}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="walks-table">
