@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { api, dateUtils, formatMinutes } from '../services/api'
+import { api, dateUtils } from '../services/api'
+import SummaryStats from './SummaryStats'
 import './StatsPage.css'
 
 function StatsPage() {
@@ -83,58 +84,50 @@ function StatsPage() {
   return (
     <div className="stats-page view-card">
       <div className="stats-header">
-        <h2>📊 Статистика прогулок</h2>
+        <h2>Статистика прогулок</h2>
         
-        <div className="period-selector">
-          <label>
-            <input 
-              type="radio" 
-              value="week" 
-              checked={period === 'week'} 
-              onChange={(e) => setPeriod(e.target.value)} 
-            />
-            Неделя
-          </label>
-          <label>
-            <input 
-              type="radio" 
-              value="month" 
-              checked={period === 'month'} 
-              onChange={(e) => setPeriod(e.target.value)} 
-            />
-            Месяц
-          </label>
-          <label>
-            <input 
-              type="radio" 
-              value="custom" 
-              checked={period === 'custom'} 
-              onChange={(e) => setPeriod(e.target.value)} 
-            />
-            Произвольный период
-          </label>
+        <div className="period-tabs">
+          {[
+            ['week', 'Неделя'],
+            ['month', 'Месяц'],
+            ['custom', 'Период'],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={period === key ? 'active' : ''}
+              onClick={() => setPeriod(key)}
+              aria-pressed={period === key}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {period === 'custom' && (
           <div className="custom-dates">
-            <input 
-              type="date" 
-              value={customFrom} 
-              onChange={(e) => setCustomFrom(e.target.value)}
-              placeholder="От"
-            />
-            <input 
-              type="date" 
-              value={customTo} 
-              onChange={(e) => setCustomTo(e.target.value)}
-              placeholder="До"
-            />
-            <button onClick={loadStats}>Применить</button>
+            <label>
+              <span>С</span>
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+              />
+            </label>
+            <label>
+              <span>По</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+              />
+            </label>
+            <button className="apply-btn" onClick={loadStats}>Применить</button>
           </div>
         )}
 
         <button className="export-btn" onClick={handleExport}>
-          📥 Экспорт в CSV
+          Экспорт в CSV
         </button>
       </div>
 
@@ -146,61 +139,20 @@ function StatsPage() {
             <h3>Период: {stats.period.from} - {stats.period.to}</h3>
           </div>
 
-          <div className="summary-cards">
-            <div className="summary-card andrey">
-              <div className="card-emoji">🔵</div>
-              <div className="card-content">
-                <div className="card-title">Андрей</div>
-                <div className="card-value">{stats.statistics.andrey}</div>
-                <div className="card-label">прогулок</div>
-                <div className="card-duration">
-                  {formatMinutes(stats.statistics.andreyDuration)}
-                </div>
-              </div>
-            </div>
-
-            <div className="summary-card ira">
-              <div className="card-emoji">🟣</div>
-              <div className="card-content">
-                <div className="card-title">Ира</div>
-                <div className="card-value">{stats.statistics.ira}</div>
-                <div className="card-label">прогулок</div>
-                <div className="card-duration">
-                  {formatMinutes(stats.statistics.iraDuration)}
-                </div>
-              </div>
-            </div>
-
-            <div className="summary-card total">
-              <div className="card-emoji">🐕</div>
-              <div className="card-content">
-                <div className="card-title">Всего</div>
-                <div className="card-value">{stats.statistics.total}</div>
-                <div className="card-label">записей</div>
-                <div className="card-duration">
-                  {formatMinutes(stats.statistics.totalDuration)}
-                </div>
-              </div>
-            </div>
-
-            <div className="summary-card poop">
-              <div className="card-emoji">💩</div>
-              <div className="card-content">
-                <div className="card-title">Покакал</div>
-                <div className="card-value">{stats.statistics.poopYes ?? 0}</div>
-                {/* Знаменатель — только отмеченные прогулки. Считать от общего
-                    числа было бы враньём: записи до появления отметки пустые */}
-                <div className="card-label">
-                  из {stats.statistics.poopMarked ?? 0} отмеченных
-                </div>
-                <div className="card-duration">
-                  {stats.statistics.poopMarked
-                    ? `${Math.round((stats.statistics.poopYes / stats.statistics.poopMarked) * 100)}%`
-                    : 'нет данных'}
-                </div>
-              </div>
-            </div>
-          </div>
+          <SummaryStats
+            summary={{
+              andrey: stats.statistics.andrey,
+              ira: stats.statistics.ira,
+              total: stats.statistics.total,
+              andreyMinutes: stats.statistics.andreyDuration,
+              iraMinutes: stats.statistics.iraDuration,
+              totalMinutes: stats.statistics.totalDuration,
+            }}
+            poop={{
+              yes: stats.statistics.poopYes ?? 0,
+              marked: stats.statistics.poopMarked ?? 0,
+            }}
+          />
 
           <div className="walks-table">
             <h3>Детализация по дням</h3>
