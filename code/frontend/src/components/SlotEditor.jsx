@@ -135,8 +135,13 @@ function SlotEditor({ isOpen, onClose, onChange, value, slotLabel, dateLabel }) 
               className={`poop-option poop-${key ?? 'none'} ${poop === key ? 'selected' : ''}`}
               onClick={() => onChange({ poop: key })}
               aria-pressed={poop === key}
+              title={poopInfo(key).title || poopInfo(key).label}
+              aria-label={poopInfo(key).title || poopInfo(key).label}
             >
-              <span aria-hidden="true">{poopInfo(key).emoji}</span> {poopInfo(key).label}
+              {poopInfo(key).emoji && (
+                <span aria-hidden="true">{poopInfo(key).emoji} </span>
+              )}
+              {poopInfo(key).label}
             </button>
           ))}
         </div>

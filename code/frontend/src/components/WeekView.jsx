@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
-import { api, dateUtils, poopInfo, SLOTS, PERSONS } from '../services/api'
+import React, { useState, useEffect, useMemo } from 'react'
+import { api, dateUtils, poopInfo, summarize, SLOTS, PERSONS } from '../services/api'
 import SlotEditor from './SlotEditor'
+import SummaryStats from './SummaryStats'
 import './WeekView.css'
 
 function WeekView() {
@@ -82,6 +83,18 @@ function WeekView() {
       loadWalks()
     }
   }
+
+  // Итоги за неделю: на этой вкладке они полезнее, чем на дневной —
+  // видно, как распределилась нагрузка между двумя людьми
+  const summary = useMemo(() => {
+    const flat = []
+    Object.values(walks).forEach((day) => {
+      Object.keys(SLOTS).forEach((slot) => {
+        if (day[slot]) flat.push({ person: day[slot], duration: day[`${slot}_duration`] || 0 })
+      })
+    })
+    return summarize(flat)
+  }, [walks])
 
   const navigateWeek = (direction) => {
     setCurrentWeek(dateUtils.addDays(currentWeek, direction * 7))
@@ -176,6 +189,8 @@ function WeekView() {
           ))}
         </div>
       </div>
+
+      <SummaryStats summary={summary} title="Статистика за неделю" />
 
       <SlotEditor
         isOpen={modalOpen}

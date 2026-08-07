@@ -147,7 +147,9 @@ export const SLOTS = {
 }
 
 export const PERSONS = {
-  none: { label: 'Никто', color: '#ecf0f1', emoji: '⬜' },
+  // ○ вместо ⬜: текстовый глиф наследует currentColor,
+  // поэтому виден и на светлой плашке, и в тёмной теме
+  none: { label: 'Никто', color: '#ecf0f1', emoji: '○' },
   andrey: { label: 'Андрей', color: '#3498db', emoji: '🔵' },
   ira: { label: 'Ира', color: '#9b59b6', emoji: '🟣' },
   both: { label: 'Оба', color: '#2ecc71', emoji: '🟢' }
@@ -156,7 +158,7 @@ export const PERSONS = {
 // Отметка о туалете. null — не отмечено, и это не то же самое, что «нет»:
 // «не проверяли» и «проверили, не было» — разные факты.
 export const POOP = {
-  null: { label: 'Не отмечено', short: 'не отмечено', emoji: '⚪' },
+  null: { label: '?', short: 'не отмечено', title: 'Не отмечено', emoji: '' },
   yes: { label: 'Покакал', short: 'покакал', emoji: '💩' },
   no: { label: 'Не покакал', short: 'не покакал', emoji: '🚫' }
 }

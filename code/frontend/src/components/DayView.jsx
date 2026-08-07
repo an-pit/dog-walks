@@ -9,6 +9,7 @@ import {
   PERSONS,
 } from '../services/api'
 import SlotEditor from './SlotEditor'
+import SummaryStats from './SummaryStats'
 import './DayView.css'
 
 function DayView() {
@@ -171,35 +172,7 @@ function DayView() {
         })}
       </div>
 
-      <div className="day-summary">
-        <h3>Статистика за день:</h3>
-        <div className="stats">
-          <div className="stat">
-            <span className="stat-emoji">🔵</span>
-            <span className="stat-name">Андрей</span>
-            <span className="stat-value">
-              {summary.andrey} <span className="stat-unit">прогулок</span>
-            </span>
-            <span className="stat-minutes">{formatMinutes(summary.andreyMinutes)}</span>
-          </div>
-          <div className="stat">
-            <span className="stat-emoji">🟣</span>
-            <span className="stat-name">Ира</span>
-            <span className="stat-value">
-              {summary.ira} <span className="stat-unit">прогулок</span>
-            </span>
-            <span className="stat-minutes">{formatMinutes(summary.iraMinutes)}</span>
-          </div>
-          <div className="stat">
-            <span className="stat-emoji">🐕</span>
-            <span className="stat-name">Всего</span>
-            <span className="stat-value">
-              {summary.total} <span className="stat-unit">прогулок</span>
-            </span>
-            <span className="stat-minutes">{formatMinutes(summary.totalMinutes)}</span>
-          </div>
-        </div>
-      </div>
+      <SummaryStats summary={summary} title="Статистика за день" />
 
       <SlotEditor
         isOpen={modalOpen}
