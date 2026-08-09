@@ -19,7 +19,11 @@
  * бэкенд — к модели. Иначе ключ утёк бы первому же посетителю.
  */
 
-export const PROMPT_VERSION = 1;
+// Поколение промпта. Поднимается при существенной правке
+// prompts/report-system.md: старые разборы остаются в базе, и по этому
+// числу видно, каким поколением получен каждый. Мелкие правки формулировок
+// версию не двигают — их различает prompt_hash, он считается автоматически.
+export const PROMPT_VERSION = 2;
 
 export function isConfigured() {
   return Boolean(process.env.LLM_API_KEY && process.env.LLM_BASE_URL);
@@ -85,18 +89,28 @@ export async function callModel(system, user, deps = {}) {
 
     const data = await response.json();
     const choice = data.choices?.[0];
-    const text = choice?.message?.content;
-
-    if (!text) {
-      const error = new Error('Модель вернула пустой ответ');
-      error.code = 'LLM_EMPTY';
-      throw error;
-    }
+    const text = (choice?.message?.content || '').trim();
 
     // finish_reason === 'length' означает, что модель упёрлась в max_tokens
     // и оборвала фразу на полуслове. Без этой отметки обрезанный ответ
     // невозможно отличить от короткого — выглядит как поломка приложения.
-    const finishReason = choice.finish_reason || null;
+    const finishReason = choice?.finish_reason || null;
+
+    if (!text) {
+      // Пустой content при finish_reason 'length' — отдельный случай:
+      // рассуждающие модели тратят лимит на размышления и до ответа
+      // не доходят вовсе. Лечится тем же LLM_MAX_TOKENS, но по общей
+      // формулировке «модель вернула пустой ответ» этого не понять.
+      const truncated = finishReason === 'length';
+      const error = new Error(
+        truncated
+          ? 'Модель израсходовала лимит токенов до начала ответа'
+          : 'Модель вернула пустой ответ'
+      );
+      error.code = truncated ? 'LLM_TRUNCATED_EMPTY' : 'LLM_EMPTY';
+      console.error('Пустой ответ модели.', { finishReason, usage: data.usage || null });
+      throw error;
+    }
 
     if (finishReason === 'length') {
       console.warn(
