@@ -32,13 +32,32 @@ function WalksChart({ data }) {
     const toY = (value) => padding.top + plotHeight - (value / ceiling) * plotHeight
     const toX = (index) => padding.left + index * stepX + stepX / 2
 
-    const bars = data.map((d, i) => ({
-      ...d,
-      x: toX(i) - barWidth / 2,
-      y: toY(d.minutes),
-      width: barWidth,
-      height: Math.max(0, padding.top + plotHeight - toY(d.minutes)),
-    }))
+    // Столбик рисует минуты. Но нулевая высота означала сразу три разные вещи,
+    // и день без единой записи выглядел так же, как день с прогулками
+    // без засечённого времени. Поэтому дни без записей помечаем отдельной
+    // бледной полосой на всю высоту, а прогулку без минут — заметным пеньком.
+    const bars = data.map((d, i) => {
+      const hasRecord = d.hasRecord !== false
+      const barHeight = Math.max(0, padding.top + plotHeight - toY(d.minutes))
+
+      return {
+        ...d,
+        hasRecord,
+        x: toX(i) - barWidth / 2,
+        y: hasRecord && d.walks > 0 && barHeight < 3 ? padding.top + plotHeight - 3 : toY(d.minutes),
+        width: barWidth,
+        height: hasRecord && d.walks > 0 ? Math.max(3, barHeight) : barHeight,
+      }
+    })
+
+    const gaps = data
+      .map((d, i) => ({ ...d, i }))
+      .filter((d) => d.hasRecord === false)
+      .map((d) => ({
+        date: d.date,
+        x: toX(d.i) - stepX / 2,
+        width: stepX,
+      }))
 
     // Линия медианы рвётся там, где базовой линии ещё нет
     const segments = []
@@ -58,12 +77,12 @@ function WalksChart({ data }) {
       y: toY(value),
     }))
 
-    return { width, height, padding, plotHeight, bars, segments, ticks, ceiling }
+    return { width, height, padding, plotHeight, bars, gaps, segments, ticks, ceiling }
   }, [data])
 
   if (!geometry) return null
 
-  const { width, height, padding, bars, segments, ticks } = geometry
+  const { width, height, padding, plotHeight, bars, gaps, segments, ticks } = geometry
 
   // Подписи дат: показываем не все, иначе на месяце они сливаются
   const labelEvery = Math.ceil(bars.length / 8)
@@ -91,6 +110,19 @@ function WalksChart({ data }) {
           </g>
         ))}
 
+        {gaps.map((gap) => (
+          <rect
+            key={`gap-${gap.date}`}
+            x={gap.x}
+            y={padding.top}
+            width={gap.width}
+            height={plotHeight}
+            className="chart-gap"
+          >
+            <title>{gap.date}: записей нет</title>
+          </rect>
+        ))}
+
         {bars.map((bar) => (
           <rect
             key={bar.date}
@@ -102,7 +134,14 @@ function WalksChart({ data }) {
             className={bar.weekend ? 'chart-bar chart-bar-weekend' : 'chart-bar'}
           >
             <title>
-              {bar.date}: {bar.minutes} мин, прогулок {bar.walks}
+              {bar.date}:{' '}
+              {!bar.hasRecord
+                ? 'записей нет'
+                : bar.walks === 0
+                  ? 'никто не гулял'
+                  : bar.minutes > 0
+                    ? `${bar.minutes} мин, прогулок ${bar.walks}`
+                    : `прогулок ${bar.walks}, длительность не засекали`}
               {bar.baseline !== null ? `, обычно ${bar.baseline}` : ''}
             </title>
           </rect>
@@ -139,6 +178,12 @@ function WalksChart({ data }) {
           <span className="chart-swatch chart-swatch-median" aria-hidden="true" />
           медиана за 28 дней
         </span>
+        {gaps.length > 0 && (
+          <span className="chart-legend-item">
+            <span className="chart-swatch chart-swatch-gap" aria-hidden="true" />
+            нет записей
+          </span>
+        )}
       </div>
     </div>
   )

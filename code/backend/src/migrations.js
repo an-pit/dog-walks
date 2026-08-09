@@ -111,6 +111,17 @@ const migrations = [
       'CREATE INDEX IF NOT EXISTS idx_reports_period ON ai_reports(period_from, period_to)'
     );
   },
+
+  // v8 — причина завершения ответа модели.
+  // 'stop' — модель договорила сама, 'length' — упёрлась в лимит токенов
+  // и оборвала фразу. Без этой отметки обрезанный разбор выглядит
+  // как поломка приложения, хотя чинится одной строкой в .env.
+  (db) => {
+    const columns = db.pragma('table_info(ai_reports)');
+    if (!columns.some((c) => c.name === 'finish_reason')) {
+      db.exec('ALTER TABLE ai_reports ADD COLUMN finish_reason TEXT DEFAULT NULL');
+    }
+  },
 ];
 
 // В тестах миграции прогоняются на каждый случай, и логи забивают вывод

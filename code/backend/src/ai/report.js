@@ -51,6 +51,7 @@ export async function generateReport(rows, from, to, deps = {}) {
     promptVersion: PROMPT_VERSION,
     payloadSize: size,
     usage: result.usage,
+    finishReason: result.finishReason ?? null,
   };
 }
 
@@ -58,10 +59,11 @@ export async function generateReport(rows, from, to, deps = {}) {
 export function findSaved(db, from, to) {
   return db
     .prepare(
-      `SELECT id, period_from, period_to, content, model, prompt_version, created_at
+      `SELECT id, period_from, period_to, content, model, prompt_version,
+              finish_reason, created_at
        FROM ai_reports
        WHERE period_from = ? AND period_to = ?
-       ORDER BY created_at DESC
+       ORDER BY created_at DESC, id DESC
        LIMIT 1`
     )
     .get(from, to);
@@ -69,9 +71,17 @@ export function findSaved(db, from, to) {
 
 export function saveReport(db, from, to, report) {
   db.prepare(
-    `INSERT INTO ai_reports (period_from, period_to, content, model, prompt_version)
-     VALUES (?, ?, ?, ?, ?)`
-  ).run(from, to, report.text, report.model, report.promptVersion);
+    `INSERT INTO ai_reports
+       (period_from, period_to, content, model, prompt_version, finish_reason)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(
+    from,
+    to,
+    report.text,
+    report.model,
+    report.promptVersion,
+    report.finishReason ?? null
+  );
 
   return findSaved(db, from, to);
 }

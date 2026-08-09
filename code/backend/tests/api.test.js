@@ -116,7 +116,21 @@ describe('GET /api/stats', () => {
     const res = await request(app).get('/api/stats?from=2026-08-01&to=2026-08-01');
     expect(res.body.statistics.andrey).toBe(0);
     expect(res.body.statistics.ira).toBe(0);
-    expect(res.body.statistics.total).toBe(1);
+    // Отметка «никто не гулял» — не прогулка, в «Всего» ей не место
+    expect(res.body.statistics.total).toBe(0);
+    // Но запись за день есть, и это отличается от полного отсутствия данных
+    expect(res.body.statistics.daysWithRecords).toBe(1);
+    expect(res.body.statistics.daysWithWalks).toBe(0);
+  });
+
+  it('отличает дни с записями от дней без данных', async () => {
+    await request(app).put('/api/walks/2026-08-01/morning').send({ person: 'andrey', duration: 30 });
+    await request(app).put('/api/walks/2026-08-03/evening').send({ person: 'ira', duration: 20 });
+
+    const res = await request(app).get('/api/stats?from=2026-08-01&to=2026-08-05');
+    expect(res.body.statistics.total).toBe(2);
+    expect(res.body.statistics.daysWithRecords).toBe(2);
+    expect(res.body.statistics.daysWithWalks).toBe(2);
   });
 });
 
@@ -217,6 +231,7 @@ describe('отметка о туалете', () => {
     expect(res.body.statistics.poopNo).toBe(1);
     expect(res.body.statistics.poopMarked).toBe(2);
     expect(res.body.statistics.total).toBe(3);
+    expect(res.body.statistics.daysWithWalks).toBe(1);
   });
 
   it('выгружается в CSV, неотмеченные — пустой ячейкой', async () => {

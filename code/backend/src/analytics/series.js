@@ -25,6 +25,11 @@ export function dailySeries(rows, from, to) {
       date,
       minutes: day ? day.minutes : 0,
       walks: day ? day.walks : 0,
+      // Три разных случая раньше выглядели на графике одинаково — пустым местом:
+      // за день вообще нет записей; записи есть, но никто не гулял;
+      // прогулки были, а длительность не засекали. Различать их важно:
+      // первое — дыра в данных, третье — обычная прогулка без минут.
+      hasRecord: Boolean(day),
       // null, пока данных не хватает — на графике линия просто не рисуется
       baseline: base.enough ? Math.round(base.value) : null,
       weekend: isWeekend(date),

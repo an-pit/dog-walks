@@ -40,6 +40,14 @@
   opacity: 0.6;
 }
 
+/* День без единой записи — бледная полоса на всю высоту.
+   Пустое место читалось как «гуляли ноль минут», хотя означало
+   «за этот день ничего не заполняли». Это разные вещи */
+.chart-gap {
+  fill: var(--text-tertiary);
+  opacity: 0.09;
+}
+
 .chart-median {
   fill: none;
   stroke: var(--warning);
@@ -73,3 +81,4 @@
 .chart-swatch-bar { background: var(--accent); opacity: 0.75; }
 .chart-swatch-weekend { background: var(--ira); opacity: 0.6; }
 .chart-swatch-median { background: var(--warning); height: 3px; border-radius: 999px; }
+.chart-swatch-gap { background: var(--text-tertiary); opacity: 0.25; }

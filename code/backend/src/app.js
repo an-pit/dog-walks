@@ -234,7 +234,15 @@ export function createApp(db) {
       const stats = {
         andrey: 0,
         ira: 0,
-        total: walks.length,
+        // Считаем состоявшиеся прогулки, а не строки в таблице.
+        // Запись person='none' означает «в этот слот никто не выходил» —
+        // это осознанная отметка об отсутствии прогулки, и раньше она
+        // раздувала «Всего» тем сильнее, чем длиннее период.
+        total: 0,
+        // Сколько дней за период вообще имеют записи. Нужно, чтобы отличить
+        // «гуляли мало» от «за эти дни просто ничего не заполняли».
+        daysWithRecords: 0,
+        daysWithWalks: 0,
         totalDuration: 0,
         andreyDuration: 0,
         iraDuration: 0,
@@ -246,9 +254,18 @@ export function createApp(db) {
         poopMarked: 0,
       };
 
+      const datesWithRecords = new Set();
+      const datesWithWalks = new Set();
+
       walks.forEach((walk) => {
         const duration = walk.duration || 0;
+        datesWithRecords.add(walk.walk_date);
+
+        if (walk.person === 'none') return;
+
+        stats.total++;
         stats.totalDuration += duration;
+        datesWithWalks.add(walk.walk_date);
 
         if (walk.person === 'andrey') {
           stats.andrey++;
@@ -274,6 +291,9 @@ export function createApp(db) {
           stats.poopMarked++;
         }
       });
+
+      stats.daysWithRecords = datesWithRecords.size;
+      stats.daysWithWalks = datesWithWalks.size;
 
       res.json({
         period: { from, to },

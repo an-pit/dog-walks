@@ -163,3 +163,38 @@ describe('ряд для графика', () => {
     expect(res.body.every((d) => d.baseline === null)).toBe(true);
   });
 });
+
+describe('обрыв ответа модели', () => {
+  it('сохраняет и отдаёт причину завершения', () => {
+    const db = openDb(':memory:');
+    migrate(db);
+
+    saveReport(db, '2026-08-01', '2026-08-07', {
+      text: 'За период зафиксировано 22 прогулки, в среднем около',
+      model: 'test-model',
+      promptVersion: 1,
+      finishReason: 'length',
+    });
+
+    // Без этой отметки обрезанный текст неотличим от короткого ответа
+    expect(findSaved(db, '2026-08-01', '2026-08-07').finish_reason).toBe('length');
+    db.close();
+  });
+
+  it('прокидывает finish_reason из ответа модели', async () => {
+    const callModel = vi.fn().mockResolvedValue({
+      text: 'разбор',
+      model: 'test-model',
+      finishReason: 'length',
+    });
+
+    const report = await generateReport(
+      [row('2026-08-01', 'morning', 'andrey', 40)],
+      '2026-08-01',
+      '2026-08-01',
+      { callModel }
+    );
+
+    expect(report.finishReason).toBe('length');
+  });
+});
