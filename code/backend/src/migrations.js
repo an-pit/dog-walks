@@ -52,7 +52,52 @@ const migrations = [
       db.exec('ALTER TABLE walks ADD COLUMN poop TEXT DEFAULT NULL');
     }
   },
+
+  // v4 — ноль в duration никогда не означал «прогулка на ноль минут»,
+  // только «не засекали». Разводим эти смыслы: теперь нет данных — это NULL.
+  // Без этого средняя длительность систематически занижалась.
+  (db) => {
+    db.exec('UPDATE walks SET duration = NULL WHERE duration = 0');
+  },
+
+  // v5 — время возвращения с прогулки.
+  // Нужно для расчёта разрыва между выходами: updated_at для этого не годится,
+  // он показывает момент редактирования записи, а не саму прогулку.
+  // Формат ISO без зоны: '2026-08-07T21:35'.
+  (db) => {
+    const columns = db.pragma('table_info(walks)');
+    if (!columns.some((c) => c.name === 'ended_at')) {
+      db.exec('ALTER TABLE walks ADD COLUMN ended_at TEXT DEFAULT NULL');
+    }
+  },
+
+  // v6 — журнал изменений.
+  // changed_by пока пустой: пользователей в приложении ещё нет.
+  // Появятся — начнёт заполняться, старые записи останутся без автора.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS walk_changes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        walk_date TEXT NOT NULL,
+        slot TEXT NOT NULL,
+        field TEXT NOT NULL,
+        old_value TEXT,
+        new_value TEXT,
+        changed_by TEXT,
+        changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    db.exec(
+      'CREATE INDEX IF NOT EXISTS idx_changes_walk ON walk_changes(walk_date, slot)'
+    );
+  },
 ];
+
+// В тестах миграции прогоняются на каждый случай, и логи забивают вывод
+const quiet = process.env.NODE_ENV === 'test';
+const log = (message) => {
+  if (!quiet) console.log(message);
+};
 
 export function migrate(db) {
   const currentVersion = db.pragma('user_version', { simple: true });
@@ -71,10 +116,10 @@ export function migrate(db) {
       db.pragma(`user_version = ${i + 1}`);
     })();
 
-    console.log(`✅ Применена миграция v${i + 1}`);
+    log(`✅ Применена миграция v${i + 1}`);
   }
 
   if (currentVersion === migrations.length) {
-    console.log(`✅ База актуальна (версия ${currentVersion})`);
+    log(`✅ База актуальна (версия ${currentVersion})`);
   }
 }

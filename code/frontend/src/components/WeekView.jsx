@@ -37,6 +37,7 @@ function WeekView() {
         walksMap[walk.walk_date][`${walk.slot}_duration`] = walk.duration || 0
         walksMap[walk.walk_date][`${walk.slot}_comments`] = walk.comments || ''
         walksMap[walk.walk_date][`${walk.slot}_poop`] = walk.poop ?? null
+        walksMap[walk.walk_date][`${walk.slot}_endedAt`] = walk.ended_at ?? null
       })
       
       setWalks(walksMap)
@@ -54,10 +55,12 @@ function WeekView() {
   }
 
   const slotValue = (date, slot) => ({
+    date,
     person: walks[date]?.[slot] || 'none',
     duration: walks[date]?.[`${slot}_duration`] || 0,
     comments: walks[date]?.[`${slot}_comments`] || '',
     poop: walks[date]?.[`${slot}_poop`] ?? null,
+    endedAt: walks[date]?.[`${slot}_endedAt`] ?? null,
   })
 
   const handlePatch = async (patch) => {
@@ -73,6 +76,7 @@ function WeekView() {
         [`${slot}_duration`]: next.duration,
         [`${slot}_comments`]: next.comments,
         [`${slot}_poop`]: next.poop,
+        [`${slot}_endedAt`]: next.endedAt,
       },
     }))
 
