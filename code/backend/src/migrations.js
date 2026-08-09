@@ -91,6 +91,26 @@ const migrations = [
       'CREATE INDEX IF NOT EXISTS idx_changes_walk ON walk_changes(walk_date, slot)'
     );
   },
+
+  // v7 — сохранённые разборы от языковой модели.
+  // Храним период, текст и версию промпта: со сменой промпта старые
+  // разборы остаются, и видно, чем именно каждый получен.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS ai_reports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        period_from TEXT NOT NULL,
+        period_to TEXT NOT NULL,
+        content TEXT NOT NULL,
+        model TEXT,
+        prompt_version INTEGER,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    db.exec(
+      'CREATE INDEX IF NOT EXISTS idx_reports_period ON ai_reports(period_from, period_to)'
+    );
+  },
 ];
 
 // В тестах миграции прогоняются на каждый случай, и логи забивают вывод

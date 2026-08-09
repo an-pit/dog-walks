@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { api, dateUtils } from '../services/api'
 import SummaryStats from './SummaryStats'
+import WalksChart from './WalksChart'
+import AiReport from './AiReport'
 import './StatsPage.css'
 
 function StatsPage() {
@@ -10,6 +12,9 @@ function StatsPage() {
   const [period, setPeriod] = useState('week')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+  const [series, setSeries] = useState([])
+  const [range, setRange] = useState(null)
+  const [helpOpen, setHelpOpen] = useState(false)
 
   useEffect(() => {
     loadStats()
@@ -53,9 +58,14 @@ function StatsPage() {
     setError('')
     
     try {
-      const range = getDateRange()
-      const data = await api.getStats(range.from, range.to)
+      const period = getDateRange()
+      const [data, seriesData] = await Promise.all([
+        api.getStats(period.from, period.to),
+        api.getSeries(period.from, period.to),
+      ])
       setStats(data)
+      setSeries(seriesData)
+      setRange(period)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -84,7 +94,50 @@ function StatsPage() {
   return (
     <div className="stats-page view-card">
       <div className="stats-header">
-        <h2>Статистика прогулок</h2>
+        <div className="stats-title">
+          <h2>Статистика прогулок</h2>
+          <button
+            type="button"
+            className="help-button"
+            onClick={() => setHelpOpen((v) => !v)}
+            aria-expanded={helpOpen}
+            aria-label="Как считаются показатели"
+            title="Как считаются показатели"
+          >
+            i
+          </button>
+        </div>
+
+        {helpOpen && (
+          <div className="stats-help">
+            <p>
+              <strong>Медиана за 28 дней</strong> — базовая линия на графике.
+              Считается для каждого дня отдельно, по 28 дням до него, поэтому
+              линия показывает норму «на тот момент», а не одно число на весь период.
+            </p>
+            <p>
+              Берём медиану, а не среднее: одна прогулка на три часа заметно
+              сдвигает среднее и почти не двигает медиану.
+            </p>
+            <p>
+              Будни сравниваются с буднями, выходные с выходными — по субботам
+              и воскресеньям прогулки обычно длиннее. На графике выходные
+              выделены другим цветом.
+            </p>
+            <p>
+              Пока накоплено меньше 14 дней, линия медианы не рисуется:
+              норма, выведенная из трёх дней, — не норма.
+            </p>
+            <p>
+              <strong>Длительность</strong> учитывается только там, где её
+              засекли. Пустое значение означает «не замеряли», а не «ноль минут».
+            </p>
+            <p>
+              <strong>Покакал</strong> считается от числа отмеченных прогулок,
+              а не от всех: записи без отметки означают «не проверяли».
+            </p>
+          </div>
+        )}
         
         <div className="period-tabs">
           {[
@@ -153,6 +206,10 @@ function StatsPage() {
               marked: stats.statistics.poopMarked ?? 0,
             }}
           />
+
+          {series.length > 0 && <WalksChart data={series} />}
+
+          {range && <AiReport from={range.from} to={range.to} />}
 
           <div className="walks-table">
             <h3>Детализация по дням</h3>
