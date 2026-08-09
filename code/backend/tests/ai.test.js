@@ -4,7 +4,17 @@ import { openDb } from '../src/db.js';
 import { migrate } from '../src/migrations.js';
 import { createApp } from '../src/app.js';
 import { buildPayload, estimateSize } from '../src/ai/payload.js';
-import { generateReport, saveReport, findSaved } from '../src/ai/report.js';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import {
+  generateReport,
+  saveReport,
+  findSaved,
+  systemPrompt,
+  promptFile,
+} from '../src/ai/report.js';
+import { callModel } from '../src/ai/provider.js';
 
 const row = (date, slot, person, duration = null, extra = {}) => ({
   walk_date: date,
@@ -196,5 +206,92 @@ describe('обрыв ответа модели', () => {
     );
 
     expect(report.finishReason).toBe('length');
+  });
+});
+
+describe('пустой ответ модели', () => {
+  const withEnv = async (fn) => {
+    const saved = { ...process.env };
+    process.env.LLM_BASE_URL = 'https://example.invalid/v1';
+    process.env.LLM_API_KEY = 'test';
+    process.env.LLM_MODEL = 'test-model';
+    try {
+      await fn();
+    } finally {
+      process.env = saved;
+    }
+  };
+
+  const reply = (body) => ({ ok: true, json: async () => body });
+
+  it('отличает исчерпанный лимит токенов от просто пустого ответа', async () => {
+    await withEnv(async () => {
+      const fetch = vi.fn().mockResolvedValue(
+        reply({ choices: [{ message: { content: '' }, finish_reason: 'length' }] })
+      );
+
+      // Рассуждающие модели тратят лимит на размышления и до ответа не доходят.
+      // По общему «пустой ответ» этого не понять, а чинится оно одной строкой в .env
+      await expect(callModel('s', 'u', { fetch })).rejects.toMatchObject({
+        code: 'LLM_TRUNCATED_EMPTY',
+      });
+    });
+  });
+
+  it('обычный пустой ответ остаётся LLM_EMPTY', async () => {
+    await withEnv(async () => {
+      const fetch = vi.fn().mockResolvedValue(
+        reply({ choices: [{ message: { content: '   ' }, finish_reason: 'stop' }] })
+      );
+
+      await expect(callModel('s', 'u', { fetch })).rejects.toMatchObject({
+        code: 'LLM_EMPTY',
+      });
+    });
+  });
+});
+
+describe('промпт в отдельном файле', () => {
+  it('по умолчанию читается из репозитория и не пуст', () => {
+    const prompt = systemPrompt();
+    expect(prompt.text.length).toBeGreaterThan(100);
+    expect(prompt.hash).toMatch(/^[0-9a-f]{8}$/);
+  });
+
+  it('LLM_PROMPT_FILE подменяет файл — так промпт правят на сервере', async () => {
+    const file = path.join(os.tmpdir(), `prompt-${Date.now()}.md`);
+    fs.writeFileSync(file, 'Пиши одним предложением.');
+    const saved = process.env.LLM_PROMPT_FILE;
+    process.env.LLM_PROMPT_FILE = file;
+
+    try {
+      expect(promptFile()).toBe(file);
+
+      const callModel = vi.fn().mockResolvedValue({ text: 'разбор', model: 'test-model' });
+      await generateReport(
+        [row('2026-08-01', 'morning', 'andrey', 40)],
+        '2026-08-01',
+        '2026-08-01',
+        { callModel }
+      );
+
+      expect(callModel.mock.calls[0][0]).toBe('Пиши одним предложением.');
+    } finally {
+      if (saved === undefined) delete process.env.LLM_PROMPT_FILE;
+      else process.env.LLM_PROMPT_FILE = saved;
+      fs.unlinkSync(file);
+    }
+  });
+
+  it('понятная ошибка, если файл потерялся', () => {
+    const saved = process.env.LLM_PROMPT_FILE;
+    process.env.LLM_PROMPT_FILE = '/nope/missing-prompt.md';
+
+    try {
+      expect(() => systemPrompt()).toThrow(/файл промпта/i);
+    } finally {
+      if (saved === undefined) delete process.env.LLM_PROMPT_FILE;
+      else process.env.LLM_PROMPT_FILE = saved;
+    }
   });
 });

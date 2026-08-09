@@ -122,6 +122,17 @@ const migrations = [
       db.exec('ALTER TABLE ai_reports ADD COLUMN finish_reason TEXT DEFAULT NULL');
     }
   },
+
+  // v9 — хеш текста промпта, которым получен разбор.
+  // prompt_version ставится руками в коде, а промпт с этой версии живёт
+  // в отдельном файле и может правиться прямо на сервере — тогда номер
+  // не поднимется, а хеш изменится сам.
+  (db) => {
+    const columns = db.pragma('table_info(ai_reports)');
+    if (!columns.some((c) => c.name === 'prompt_hash')) {
+      db.exec('ALTER TABLE ai_reports ADD COLUMN prompt_hash TEXT DEFAULT NULL');
+    }
+  },
 ];
 
 // В тестах миграции прогоняются на каждый случай, и логи забивают вывод
