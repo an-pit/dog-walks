@@ -1,0 +1,75 @@
+.chart {
+  margin-top: var(--space-4);
+}
+
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.chart-tick,
+.chart-label {
+  fill: var(--text-tertiary);
+  font-size: 11px;
+  font-family: var(--font);
+}
+
+.chart-tick {
+  text-anchor: end;
+}
+
+.chart-label {
+  text-anchor: middle;
+}
+
+.chart-bar {
+  fill: var(--accent);
+  opacity: 0.75;
+}
+
+/* Выходные отличаются оттенком: в них прогулки заметно длиннее,
+   и без пометки график выглядел бы хаотичным */
+.chart-bar-weekend {
+  fill: var(--ira);
+  opacity: 0.6;
+}
+
+.chart-median {
+  fill: none;
+  stroke: var(--warning);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.chart-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.chart-swatch-bar { background: var(--accent); opacity: 0.75; }
+.chart-swatch-weekend { background: var(--ira); opacity: 0.6; }
+.chart-swatch-median { background: var(--warning); height: 3px; border-radius: 999px; }

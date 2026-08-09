@@ -48,6 +48,40 @@ export const api = {
     return await response.json()
   },
 
+  // Ряд по дням для графика
+  async getSeries(from, to) {
+    const response = await fetch(`${API_BASE}/series?from=${from}&to=${to}`)
+    if (!response.ok) {
+      throw new Error(`Ошибка получения ряда: ${response.status}`)
+    }
+    return await response.json()
+  },
+
+  // Сохранённый разбор периода
+  async getAiReport(from, to) {
+    const response = await fetch(`${API_BASE}/ai-report?from=${from}&to=${to}`)
+    if (!response.ok) {
+      throw new Error(`Ошибка получения разбора: ${response.status}`)
+    }
+    return await response.json()
+  },
+
+  // Сгенерировать разбор заново. POST, а не GET: запрос стоит денег
+  // и меняет состояние — такое не должно случаться от перехода по ссылке.
+  async generateAiReport(from, to) {
+    const response = await fetch(`${API_BASE}/ai-report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to }),
+    })
+
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(data.error || `Ошибка генерации: ${response.status}`)
+    }
+    return data
+  },
+
   // Получить статистику
   async getStats(from, to) {
     const response = await fetch(`${API_BASE}/stats?from=${from}&to=${to}`)

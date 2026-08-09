@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import { observationsForDate, periodSummary } from './analytics/observations.js';
+import { dailySeries } from './analytics/series.js';
+import { generateReport, findSaved, saveReport } from './ai/report.js';
+import { isConfigured } from './ai/provider.js';
 
 const SLOTS = ['morning', 'afternoon', 'evening'];
 const PERSONS = ['andrey', 'ira', 'both', 'none'];
@@ -376,6 +379,95 @@ export function createApp(db) {
     } catch (error) {
       console.error('Ошибка расчёта сводки:', error);
       res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // GET /api/series?from=&to= — ряд по дням для графика
+  app.get('/api/series', (req, res) => {
+    try {
+      const { from, to } = req.query;
+
+      if (!isValidDate(from) || !isValidDate(to)) {
+        return res.status(400).json({ error: 'Неверный формат даты. Используйте YYYY-MM-DD' });
+      }
+
+      // Берём на 28 дней раньше начала периода: скользящей медиане
+      // нужна история, иначе в начале графика линии не будет
+      const historyFrom = new Date(`${from}T12:00:00`);
+      historyFrom.setDate(historyFrom.getDate() - 28);
+
+      const rows = db
+        .prepare(
+          `SELECT * FROM walks
+           WHERE walk_date BETWEEN ? AND ?
+           ORDER BY walk_date, slot`
+        )
+        .all(historyFrom.toISOString().slice(0, 10), to);
+
+      res.json(dailySeries(rows, from, to));
+    } catch (error) {
+      console.error('Ошибка построения ряда:', error);
+      res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // GET /api/ai-report?from=&to= — сохранённый разбор, если он есть
+  app.get('/api/ai-report', (req, res) => {
+    try {
+      const { from, to } = req.query;
+
+      if (!isValidDate(from) || !isValidDate(to)) {
+        return res.status(400).json({ error: 'Неверный формат даты. Используйте YYYY-MM-DD' });
+      }
+
+      const saved = findSaved(db, from, to);
+      res.json({ report: saved || null, available: isConfigured() });
+    } catch (error) {
+      console.error('Ошибка чтения разбора:', error);
+      res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // POST /api/ai-report — сгенерировать разбор заново.
+  // Метод POST, а не GET: запрос стоит денег и меняет состояние,
+  // такое не должно случаться от простого перехода по ссылке.
+  app.post('/api/ai-report', async (req, res) => {
+    try {
+      const { from, to } = req.body || {};
+
+      if (!isValidDate(from) || !isValidDate(to)) {
+        return res.status(400).json({ error: 'Неверный формат даты. Используйте YYYY-MM-DD' });
+      }
+
+      const rows = db
+        .prepare(
+          `SELECT * FROM walks
+           WHERE walk_date BETWEEN ? AND ?
+           ORDER BY walk_date, slot`
+        )
+        .all(from, to);
+
+      const report = await generateReport(rows, from, to);
+      const saved = saveReport(db, from, to, report);
+
+      res.json({ report: saved });
+    } catch (error) {
+      // Понятные пользователю ошибки отделяем от внутренних
+      const known = {
+        LLM_NOT_CONFIGURED: [503, 'Разбор недоступен: модель не настроена на сервере'],
+        NO_DATA: [400, 'За выбранный период нет данных о прогулках'],
+        PAYLOAD_TOO_BIG: [400, 'Слишком длинный период, выберите короче'],
+        LLM_HTTP_ERROR: [502, 'Модель временно недоступна, попробуйте позже'],
+        LLM_EMPTY: [502, 'Модель вернула пустой ответ, попробуйте ещё раз'],
+      };
+
+      if (known[error.code]) {
+        const [status, message] = known[error.code];
+        return res.status(status).json({ error: message });
+      }
+
+      console.error('Ошибка генерации разбора:', error);
+      res.status(500).json({ error: 'Не удалось построить разбор' });
     }
   });
 
