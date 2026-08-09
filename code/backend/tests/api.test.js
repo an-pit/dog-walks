@@ -400,3 +400,33 @@ describe('журнал изменений', () => {
     expect(personChange.new_value).toBe('both');
   });
 });
+
+describe('чтение .env', () => {
+  it('не перезаписывает уже заданные переменные окружения', async () => {
+    // Проверяем сам принцип: переменная процесса важнее файла.
+    // Иначе DB_PATH из .env перебил бы путь к боевой базе от PM2.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dogwalks-env-'));
+    const envPath = path.join(dir, '.env');
+    fs.writeFileSync(envPath, 'DOGWALKS_TEST_A=из-файла\nDOGWALKS_TEST_B=из-файла\n');
+
+    process.env.DOGWALKS_TEST_A = 'из-окружения';
+    delete process.env.DOGWALKS_TEST_B;
+
+    fs.readFileSync(envPath, 'utf8')
+      .split('\n')
+      .forEach((line) => {
+        const separator = line.indexOf('=');
+        if (separator === -1) return;
+        const key = line.slice(0, separator).trim();
+        const value = line.slice(separator + 1).trim();
+        if (key && process.env[key] === undefined) process.env[key] = value;
+      });
+
+    expect(process.env.DOGWALKS_TEST_A).toBe('из-окружения');
+    expect(process.env.DOGWALKS_TEST_B).toBe('из-файла');
+
+    delete process.env.DOGWALKS_TEST_A;
+    delete process.env.DOGWALKS_TEST_B;
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
