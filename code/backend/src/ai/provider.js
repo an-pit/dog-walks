@@ -9,7 +9,7 @@
  * LLM_API_KEY     — ключ сервисного аккаунта, живёт только на сервере
  * LLM_MODEL       — полный URI: gpt://<id-каталога>/<модель>/latest
  * LLM_TEMPERATURE — необязательно, по умолчанию 0.3
- * LLM_MAX_TOKENS  — необязательно, по умолчанию 1200
+ * LLM_MAX_TOKENS  — необязательно, по умолчанию 2000
  *
  * Температура и лимит вынесены в окружение намеренно: подкрутить их
  * можно правкой .env и `pm2 reload`, без выкатки кода. А промпт остаётся
@@ -63,7 +63,7 @@ export async function callModel(system, user, deps = {}) {
       },
       body: JSON.stringify({
         model: modelName(),
-        max_tokens: envNumber('LLM_MAX_TOKENS', 1200),
+        max_tokens: envNumber('LLM_MAX_TOKENS', 2000),
         temperature: envNumber('LLM_TEMPERATURE', 0.3),
         messages: [
           { role: 'system', content: system },
@@ -84,7 +84,8 @@ export async function callModel(system, user, deps = {}) {
     }
 
     const data = await response.json();
-    const text = data.choices?.[0]?.message?.content;
+    const choice = data.choices?.[0];
+    const text = choice?.message?.content;
 
     if (!text) {
       const error = new Error('Модель вернула пустой ответ');
@@ -92,10 +93,23 @@ export async function callModel(system, user, deps = {}) {
       throw error;
     }
 
+    // finish_reason === 'length' означает, что модель упёрлась в max_tokens
+    // и оборвала фразу на полуслове. Без этой отметки обрезанный ответ
+    // невозможно отличить от короткого — выглядит как поломка приложения.
+    const finishReason = choice.finish_reason || null;
+
+    if (finishReason === 'length') {
+      console.warn(
+        `Ответ модели оборван по лимиту токенов (LLM_MAX_TOKENS=${envNumber('LLM_MAX_TOKENS', 2000)}).`,
+        data.usage || ''
+      );
+    }
+
     return {
       text,
       model: data.model || modelName(),
       usage: data.usage || null,
+      finishReason,
     };
   } finally {
     clearTimeout(timeout);

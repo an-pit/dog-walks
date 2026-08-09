@@ -82,6 +82,14 @@ function AiReport({ from, to }) {
               <p key={i}>{paragraph}</p>
             ))}
           </div>
+          {/* Обрыв по лимиту токенов выглядит как поломка приложения:
+              текст просто кончается на полуслове. Говорим прямо, что случилось */}
+          {report.finish_reason === 'length' && (
+            <p className="ai-warning">
+              Ответ оборван: модель упёрлась в лимит токенов. Увеличьте
+              LLM_MAX_TOKENS в .env на сервере и перегенерируйте.
+            </p>
+          )}
           <p className="ai-meta">
             {new Date(report.created_at + 'Z').toLocaleString('ru-RU')} · {report.model}
           </p>

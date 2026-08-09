@@ -11,6 +11,7 @@ import {
   loadByPerson,
 } from '../src/analytics/metrics.js';
 import { observationsForDate } from '../src/analytics/observations.js';
+import { dailySeries } from '../src/analytics/series.js';
 
 // Хелпер: строка в том виде, в каком её отдаёт база
 const row = (date, slot, person, duration = null, extra = {}) => ({
@@ -236,5 +237,25 @@ describe('наблюдения за день', () => {
     expect(result.baselineReady).toBe(true);
     expect(result.comparisons.minutes.deviationPercent).toBe(-50);
     expect(result.notes.some((n) => n.text.includes('50%'))).toBe(true);
+  });
+});
+
+describe('ряд для графика', () => {
+  it('отличает день без записей от дня без засечённого времени', () => {
+    const series = dailySeries(
+      [
+        row('2026-08-01', 'morning', 'andrey', 30),
+        // 2 августа записей нет вообще
+        row('2026-08-03', 'morning', 'ira'), // гуляли, но время не засекали
+        row('2026-08-04', 'morning', 'none'),
+      ],
+      '2026-08-01',
+      '2026-08-04'
+    );
+
+    expect(series.map((d) => d.hasRecord)).toEqual([true, false, true, true]);
+    expect(series.map((d) => d.minutes)).toEqual([30, 0, 0, 0]);
+    // Прогулка без минут всё равно прогулка, а «никто не гулял» — нет
+    expect(series.map((d) => d.walks)).toEqual([1, 0, 1, 0]);
   });
 });

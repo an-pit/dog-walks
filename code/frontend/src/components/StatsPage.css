@@ -113,6 +113,12 @@
   text-align: center;
 }
 
+.period-coverage {
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
 .period-info h3 {
   font-size: var(--text-sm);
   font-weight: var(--weight-regular);

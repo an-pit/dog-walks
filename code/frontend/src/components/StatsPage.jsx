@@ -133,6 +133,11 @@ function StatsPage() {
               засекли. Пустое значение означает «не замеряли», а не «ноль минут».
             </p>
             <p>
+              <strong>Пустое место на графике</strong> — прогулок не было.
+              Бледная полоса — за этот день вообще нет записей. Низкий пенёк —
+              прогулки были, а время не засекали.
+            </p>
+            <p>
               <strong>Покакал</strong> считается от числа отмеченных прогулок,
               а не от всех: записи без отметки означают «не проверяли».
             </p>
@@ -190,6 +195,14 @@ function StatsPage() {
         <div className="stats-content">
           <div className="period-info">
             <h3>Период: {stats.period.from} - {stats.period.to}</h3>
+            {/* Без этой строки провал на графике читался как «мало гуляли»,
+                хотя означал, что за те дни просто ничего не заполняли */}
+            {stats.statistics.daysWithRecords !== undefined && (
+              <p className="period-coverage">
+                Записи есть за {stats.statistics.daysWithRecords} дн. из{' '}
+                {daysBetween(stats.period.from, stats.period.to)}
+              </p>
+            )}
           </div>
 
           <SummaryStats
@@ -244,6 +257,13 @@ function StatsPage() {
       )}
     </div>
   )
+}
+
+/** Длина периода в днях, включая обе границы */
+function daysBetween(from, to) {
+  const start = new Date(`${from}T12:00:00`)
+  const end = new Date(`${to}T12:00:00`)
+  return Math.round((end - start) / 86400000) + 1
 }
 
 function groupWalksByDate(walks) {
