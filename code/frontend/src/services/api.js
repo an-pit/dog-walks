@@ -14,19 +14,37 @@ export const api = {
   // Обновить прогулку.
   // Детали передаются объектом, а не позиционными аргументами: полей уже
   // четыре, и при добавлении следующего не придётся править все вызовы.
-  async updateWalk(date, slot, { person, duration = 0, comments = '', poop = null }) {
+  async updateWalk(date, slot, { person, duration = null, comments = '', poop = null, endedAt = null }) {
     const response = await fetch(`${API_BASE}/walks/${date}/${slot}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ person, duration, comments, poop })
+      body: JSON.stringify({ person, duration, comments, poop, endedAt })
     })
 
     if (!response.ok) {
       throw new Error(`Ошибка обновления: ${response.status}`)
     }
 
+    return await response.json()
+  },
+
+  // Наблюдения за день: факты и отклонения от собственной нормы
+  async getInsights(date) {
+    const response = await fetch(`${API_BASE}/insights?date=${date}`)
+    if (!response.ok) {
+      throw new Error(`Ошибка получения наблюдений: ${response.status}`)
+    }
+    return await response.json()
+  },
+
+  // Журнал изменений записи
+  async getChanges(date, slot) {
+    const response = await fetch(`${API_BASE}/changes?date=${date}&slot=${slot}`)
+    if (!response.ok) {
+      throw new Error(`Ошибка получения журнала: ${response.status}`)
+    }
     return await response.json()
   },
 
@@ -93,6 +111,19 @@ export const dateUtils = {
       month: 'short'
     })
   }
+}
+
+/**
+ * Текущее локальное время как 'YYYY-MM-DDTHH:MM'.
+ * toISOString() не подходит: он переводит в UTC, и вечерняя прогулка
+ * в UTC+3 записалась бы вчерашним днём.
+ */
+export function localDateTime(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0')
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  )
 }
 
 // Минуты в читаемый вид: 0 → «0 мин», 45 → «45 мин», 125 → «2 ч 5 мин»

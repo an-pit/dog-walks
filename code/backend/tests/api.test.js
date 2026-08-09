@@ -239,10 +239,17 @@ describe('отметка о туалете', () => {
 describe('миграции', () => {
   it('повторный запуск ничего не ломает', () => {
     const db = openDb(':memory:');
+
     migrate(db);
+    const afterFirst = db.pragma('user_version', { simple: true });
+
     migrate(db);
-    const version = db.pragma('user_version', { simple: true });
-    expect(version).toBe(3);
+    const afterSecond = db.pragma('user_version', { simple: true });
+
+    // Проверяем идемпотентность, а не конкретный номер: иначе тест
+    // придётся править при каждой новой миграции
+    expect(afterSecond).toBe(afterFirst);
+    expect(afterFirst).toBeGreaterThan(0);
   });
 
   it('докатывает схему со старой версии', () => {
@@ -300,5 +307,96 @@ describe('openDb', () => {
     expect(fs.existsSync(nested)).toBe(true);
 
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('длительность как отсутствие данных', () => {
+  it('ноль сохраняется как null, а не как «ноль минут»', async () => {
+    await request(app)
+      .put('/api/walks/2026-08-01/morning')
+      .send({ person: 'andrey', duration: 0 });
+
+    const res = await request(app).get('/api/walks?from=2026-08-01&to=2026-08-01');
+    expect(res.body[0].duration).toBeNull();
+  });
+
+  it('отсутствие поля тоже даёт null', async () => {
+    await request(app).put('/api/walks/2026-08-01/morning').send({ person: 'ira' });
+
+    const res = await request(app).get('/api/walks?from=2026-08-01&to=2026-08-01');
+    expect(res.body[0].duration).toBeNull();
+  });
+
+  it('миграция v4 превращает старые нули в null', () => {
+    const db = openDb(':memory:');
+    db.exec(`
+      CREATE TABLE walks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        walk_date TEXT NOT NULL,
+        slot TEXT NOT NULL CHECK (slot IN ('morning', 'afternoon', 'evening')),
+        person TEXT NOT NULL CHECK (person IN ('andrey', 'ira', 'both', 'none')),
+        duration INTEGER DEFAULT 0,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(walk_date, slot)
+      )
+    `);
+    db.prepare(
+      "INSERT INTO walks (walk_date, slot, person, duration) VALUES ('2026-05-01','morning','andrey',0)"
+    ).run();
+    db.prepare(
+      "INSERT INTO walks (walk_date, slot, person, duration) VALUES ('2026-05-01','evening','ira',45)"
+    ).run();
+
+    migrate(db);
+
+    const rows = db.prepare('SELECT slot, duration FROM walks ORDER BY slot').all();
+    expect(rows.find((r) => r.slot === 'morning').duration).toBeNull();
+    expect(rows.find((r) => r.slot === 'evening').duration).toBe(45);
+  });
+});
+
+describe('время возвращения', () => {
+  it('сохраняется и отдаётся', async () => {
+    await request(app)
+      .put('/api/walks/2026-08-01/evening')
+      .send({ person: 'andrey', duration: 40, endedAt: '2026-08-01T21:35' });
+
+    const res = await request(app).get('/api/walks?from=2026-08-01&to=2026-08-01');
+    expect(res.body[0].ended_at).toBe('2026-08-01T21:35');
+  });
+
+  it('отклоняет мусор вместо времени', async () => {
+    const res = await request(app)
+      .put('/api/walks/2026-08-01/evening')
+      .send({ person: 'andrey', endedAt: 'вчера вечером' });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('журнал изменений', () => {
+  it('записывает только изменившиеся поля', async () => {
+    await request(app)
+      .put('/api/walks/2026-08-01/morning')
+      .send({ person: 'andrey', duration: 30 });
+    await request(app)
+      .put('/api/walks/2026-08-01/morning')
+      .send({ person: 'ira', duration: 30 });
+
+    const res = await request(app).get('/api/changes?date=2026-08-01&slot=morning');
+    const fields = res.body.map((c) => c.field);
+
+    expect(fields).toContain('person');
+    // duration не менялась во втором запросе — записи о ней быть не должно
+    expect(fields.filter((f) => f === 'duration')).toHaveLength(1);
+  });
+
+  it('хранит старое и новое значение', async () => {
+    await request(app).put('/api/walks/2026-08-01/morning').send({ person: 'andrey' });
+    await request(app).put('/api/walks/2026-08-01/morning').send({ person: 'both' });
+
+    const res = await request(app).get('/api/changes?date=2026-08-01&slot=morning');
+    const personChange = res.body.find((c) => c.field === 'person' && c.old_value === 'andrey');
+
+    expect(personChange.new_value).toBe('both');
   });
 });

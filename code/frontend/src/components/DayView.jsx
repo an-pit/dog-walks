@@ -10,6 +10,7 @@ import {
 } from '../services/api'
 import SlotEditor from './SlotEditor'
 import SummaryStats from './SummaryStats'
+import Observations from './Observations'
 import './DayView.css'
 
 function DayView() {
@@ -38,6 +39,7 @@ function DayView() {
         walksMap[`${walk.slot}_duration`] = walk.duration || 0
         walksMap[`${walk.slot}_comments`] = walk.comments || ''
         walksMap[`${walk.slot}_poop`] = walk.poop ?? null
+        walksMap[`${walk.slot}_endedAt`] = walk.ended_at ?? null
       })
       
       setWalks(walksMap)
@@ -54,10 +56,12 @@ function DayView() {
   }
 
   const slotValue = (slot) => ({
+    date: dateStr,
     person: walks[slot] || 'none',
     duration: walks[`${slot}_duration`] || 0,
     comments: walks[`${slot}_comments`] || '',
     poop: walks[`${slot}_poop`] ?? null,
+    endedAt: walks[`${slot}_endedAt`] ?? null,
   })
 
   // Сохранение мгновенное: панель шлёт только изменившееся поле,
@@ -74,6 +78,7 @@ function DayView() {
       [`${slot}_duration`]: next.duration,
       [`${slot}_comments`]: next.comments,
       [`${slot}_poop`]: next.poop,
+      [`${slot}_endedAt`]: next.endedAt,
     }))
 
     try {
@@ -173,6 +178,9 @@ function DayView() {
       </div>
 
       <SummaryStats summary={summary} title="Статистика за день" />
+
+      {/* key по дате: при смене дня наблюдения перезапрашиваются */}
+      <Observations key={dateStr} date={dateStr} />
 
       <SlotEditor
         isOpen={modalOpen}

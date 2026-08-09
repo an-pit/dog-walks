@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { observationsForDate, periodSummary } from './analytics/observations.js';
 
 const SLOTS = ['morning', 'afternoon', 'evening'];
 const PERSONS = ['andrey', 'ira', 'both', 'none'];
@@ -16,6 +17,46 @@ function isValidDate(dateString) {
   if (!regex.test(dateString)) return false;
   const date = new Date(dateString);
   return date instanceof Date && !isNaN(date);
+}
+
+// Время возвращения: 'YYYY-MM-DDTHH:MM' либо с секундами
+function isValidDateTime(value) {
+  if (typeof value !== 'string') return false;
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(value)) return false;
+  return !isNaN(new Date(value).getTime());
+}
+
+// Поля, изменения которых попадают в журнал
+const TRACKED_FIELDS = ['person', 'duration', 'comments', 'poop', 'ended_at'];
+
+/**
+ * Пишет в журнал только реально изменившиеся поля.
+ * changed_by пока не заполняется: пользователей в приложении ещё нет.
+ * Журнал не должен ронять запись прогулки, поэтому ошибки здесь глушатся.
+ */
+function recordChanges(db, date, slot, before, after) {
+  try {
+    const insert = db.prepare(
+      `INSERT INTO walk_changes (walk_date, slot, field, old_value, new_value)
+       VALUES (?, ?, ?, ?, ?)`
+    );
+
+    const write = db.transaction(() => {
+      TRACKED_FIELDS.forEach((field) => {
+        const oldValue = before ? before[field] : null;
+        const newValue = after[field];
+
+        const normalize = (v) => (v === null || v === undefined || v === '' ? null : String(v));
+        if (normalize(oldValue) === normalize(newValue)) return;
+
+        insert.run(date, slot, field, normalize(oldValue), normalize(newValue));
+      });
+    });
+
+    write();
+  } catch (error) {
+    console.error('Не удалось записать изменение в журнал:', error);
+  }
 }
 
 /**
@@ -80,7 +121,11 @@ export function createApp(db) {
   app.put('/api/walks/:date/:slot', (req, res) => {
     try {
       const { date, slot } = req.params;
-      const { person, duration = 0, comments = '', poop = null } = req.body;
+      const { person, comments = '', poop = null } = req.body;
+      // duration приходит числом либо null: null означает «не засекали».
+      // До миграции v4 эти два случая были неразличимы.
+      const duration = req.body.duration === undefined ? null : req.body.duration;
+      const endedAt = req.body.endedAt ?? req.body.ended_at ?? null;
 
       if (!isValidDate(date)) {
         return res.status(400).json({ error: 'Неверный формат даты. Используйте YYYY-MM-DD' });
@@ -98,11 +143,22 @@ export function createApp(db) {
           .json({ error: `Неверное значение person. Допустимые значения: ${PERSONS.join(', ')}` });
       }
 
-      const durationNum = parseInt(duration);
-      if (isNaN(durationNum) || durationNum < 0 || durationNum > MAX_DURATION) {
+      let durationNum = null;
+      if (duration !== null && duration !== '') {
+        durationNum = parseInt(duration);
+        if (isNaN(durationNum) || durationNum < 0 || durationNum > MAX_DURATION) {
+          return res
+            .status(400)
+            .json({ error: `Длительность должна быть числом от 0 до ${MAX_DURATION} минут` });
+        }
+        // Ноль означает «не засекали» — храним как отсутствие данных
+        if (durationNum === 0) durationNum = null;
+      }
+
+      if (endedAt !== null && !isValidDateTime(endedAt)) {
         return res
           .status(400)
-          .json({ error: `Длительность должна быть числом от 0 до ${MAX_DURATION} минут` });
+          .json({ error: 'Неверный формат времени. Используйте YYYY-MM-DDTHH:MM' });
       }
 
       const poopValue = poop === undefined ? null : poop;
@@ -112,19 +168,33 @@ export function createApp(db) {
           .json({ error: 'Неверное значение poop. Допустимые значения: null, yes, no' });
       }
 
+      // Читаем прежнее состояние до записи — нужно для журнала изменений
+      const before = db
+        .prepare('SELECT * FROM walks WHERE walk_date = ? AND slot = ?')
+        .get(date, slot);
+
       const result = db
         .prepare(
-          `INSERT INTO walks (walk_date, slot, person, duration, comments, poop)
-           VALUES (?, ?, ?, ?, ?, ?)
+          `INSERT INTO walks (walk_date, slot, person, duration, comments, poop, ended_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(walk_date, slot)
            DO UPDATE SET
              person = excluded.person,
              duration = excluded.duration,
              comments = excluded.comments,
              poop = excluded.poop,
+             ended_at = excluded.ended_at,
              updated_at = CURRENT_TIMESTAMP`
         )
-        .run(date, slot, person, durationNum, comments, poopValue);
+        .run(date, slot, person, durationNum, comments, poopValue, endedAt);
+
+      recordChanges(db, date, slot, before, {
+        person,
+        duration: durationNum,
+        comments,
+        poop: poopValue,
+        ended_at: endedAt,
+      });
 
       res.json({
         success: true,
@@ -238,13 +308,13 @@ export function createApp(db) {
       const slotMap = { morning: 'Утро', afternoon: 'День', evening: 'Вечер' };
       const poopMap = { yes: 'Да', no: 'Нет' };
 
-      let csv = 'Дата,Слот,Кто гулял,Длительность (мин),Туалет,Комментарий\n';
+      let csv = 'Дата,Слот,Кто гулял,Длительность (мин),Туалет,Время возвращения,Комментарий\n';
 
       walks.forEach((walk) => {
         const escapedComments = (walk.comments || '').replace(/"/g, '""').replace(/,/g, ';');
         // Не отмеченные прогулки остаются пустой ячейкой, а не «Нет»
         const poopLabel = poopMap[walk.poop] || '';
-        csv += `${walk.walk_date},${slotMap[walk.slot]},${personMap[walk.person]},${walk.duration || 0},${poopLabel},"${escapedComments}"\n`;
+        csv += `${walk.walk_date},${slotMap[walk.slot]},${personMap[walk.person]},${walk.duration ?? ''},${poopLabel},${walk.ended_at || ''},"${escapedComments}"\n`;
       });
 
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -252,6 +322,85 @@ export function createApp(db) {
       res.send(csv);
     } catch (error) {
       console.error('Ошибка экспорта:', error);
+      res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // GET /api/insights?date=YYYY-MM-DD — наблюдения за день.
+  // Берём 60 дней истории: базовой линии нужно 28, плюс запас
+  // на пропуски и на подсчёт серий без отметок.
+  app.get('/api/insights', (req, res) => {
+    try {
+      const date = req.query.date || new Date().toISOString().slice(0, 10);
+
+      if (!isValidDate(date)) {
+        return res.status(400).json({ error: 'Неверный формат даты. Используйте YYYY-MM-DD' });
+      }
+
+      const from = new Date(`${date}T12:00:00`);
+      from.setDate(from.getDate() - 60);
+
+      const rows = db
+        .prepare(
+          `SELECT * FROM walks
+           WHERE walk_date BETWEEN ? AND ?
+           ORDER BY walk_date, slot`
+        )
+        .all(from.toISOString().slice(0, 10), date);
+
+      res.json(observationsForDate(rows, date));
+    } catch (error) {
+      console.error('Ошибка расчёта наблюдений:', error);
+      res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // GET /api/summary?from=&to= — сводка за период для страницы статистики
+  app.get('/api/summary', (req, res) => {
+    try {
+      const { from, to } = req.query;
+
+      if (!isValidDate(from) || !isValidDate(to)) {
+        return res.status(400).json({ error: 'Неверный формат даты. Используйте YYYY-MM-DD' });
+      }
+
+      const rows = db
+        .prepare(
+          `SELECT * FROM walks
+           WHERE walk_date BETWEEN ? AND ?
+           ORDER BY walk_date, slot`
+        )
+        .all(from, to);
+
+      res.json(periodSummary(rows));
+    } catch (error) {
+      console.error('Ошибка расчёта сводки:', error);
+      res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+  });
+
+  // GET /api/changes?date=&slot= — журнал изменений записи
+  app.get('/api/changes', (req, res) => {
+    try {
+      const { date, slot } = req.query;
+
+      if (!isValidDate(date) || !SLOTS.includes(slot)) {
+        return res.status(400).json({ error: 'Нужны корректные date и slot' });
+      }
+
+      const changes = db
+        .prepare(
+          `SELECT field, old_value, new_value, changed_by, changed_at
+           FROM walk_changes
+           WHERE walk_date = ? AND slot = ?
+           ORDER BY changed_at DESC, id DESC
+           LIMIT 50`
+        )
+        .all(date, slot);
+
+      res.json(changes);
+    } catch (error) {
+      console.error('Ошибка чтения журнала:', error);
       res.status(500).json({ error: 'Внутренняя ошибка сервера' });
     }
   });

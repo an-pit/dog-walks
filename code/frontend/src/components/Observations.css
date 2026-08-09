@@ -1,0 +1,113 @@
+.observations {
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+}
+
+.obs-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.obs-head h3 {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.obs-method-toggle {
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  padding: var(--space-1);
+}
+
+/* Методика расчёта раскрывается по запросу: нужна не каждый раз,
+   но должна быть доступна всегда — иначе цифрам нельзя доверять */
+.obs-method {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.obs-method p + p {
+  margin-top: var(--space-2);
+}
+
+.obs-method-current {
+  color: var(--text);
+}
+
+.obs-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.obs-facts > div {
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.obs-facts dt {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.obs-facts dd {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.obs-baseline {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.obs-down { color: var(--warning); font-weight: var(--weight-medium); }
+.obs-up { color: var(--both); font-weight: var(--weight-medium); }
+
+.obs-hint {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.obs-notes {
+  margin-top: var(--space-3);
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.obs-note {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  background: var(--surface);
+  border-left: 3px solid var(--border-strong);
+  color: var(--text);
+}
+
+/* Только два тона: нейтральный факт и то, на что стоит взглянуть.
+   Красного нет намеренно — приложение не ставит диагнозов */
+.obs-attention {
+  border-left-color: var(--warning);
+}
+
+.obs-info {
+  border-left-color: var(--accent);
+}

@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { PERSONS, PERSON_ORDER, POOP_ORDER, poopInfo, formatMinutes } from '../services/api'
+import {
+  PERSONS,
+  PERSON_ORDER,
+  POOP_ORDER,
+  poopInfo,
+  formatMinutes,
+  localDateTime,
+} from '../services/api'
 import './SlotEditor.css'
 
 const PRESETS = [15, 30, 45, 60]
@@ -14,7 +21,8 @@ const PRESETS = [15, 30, 45, 60]
  * иначе запрос уходил бы на каждое нажатие клавиши.
  */
 function SlotEditor({ isOpen, onClose, onChange, value, slotLabel, dateLabel }) {
-  const { person = 'none', duration = 0, comments = '', poop = null } = value || {}
+  const { person = 'none', duration = 0, comments = '', poop = null, endedAt = null } =
+    value || {}
 
   const [draftComments, setDraftComments] = useState('')
   const [commentsOpen, setCommentsOpen] = useState(false)
@@ -126,6 +134,32 @@ function SlotEditor({ isOpen, onClose, onChange, value, slotLabel, dateLabel }) 
             autoFocus
           />
         )}
+
+        {/* Время возвращения. Нужно для расчёта разрыва между прогулками:
+            updated_at для этого не годится, он показывает момент правки записи */}
+        <div className="ended-row">
+          <span className="ended-label">Вернулись</span>
+          <input
+            className="ended-input"
+            type="time"
+            value={endedAt ? endedAt.slice(11, 16) : ''}
+            onChange={(e) => {
+              const time = e.target.value
+              if (!time) return onChange({ endedAt: null })
+              // Дату берём из самой записи, а не из «сегодня»:
+              // запись могут править задним числом
+              const day = value?.date || localDateTime().slice(0, 10)
+              onChange({ endedAt: `${day}T${time}` })
+            }}
+          />
+          <button
+            type="button"
+            className="ended-now"
+            onClick={() => onChange({ endedAt: localDateTime() })}
+          >
+            Сейчас
+          </button>
+        </div>
 
         <div className="poop-row">
           {POOP_ORDER.map((key) => (
