@@ -202,7 +202,9 @@ function WeekView() {
         onChange={handlePatch}
         value={currentSlot ? slotValue(currentDate, currentSlot) : null}
         slotLabel={SLOTS[currentSlot]}
-        dateLabel={currentDate ? new Date(currentDate).toLocaleDateString('ru-RU') : ''}
+        dateLabel={
+          currentDate ? dateUtils.parseDate(currentDate).toLocaleDateString('ru-RU') : ''
+        }
       />
     </div>
   )

@@ -9,11 +9,15 @@ import './Observations.css'
  * обычного», а не «мало гуляли». Никаких медицинских порогов —
  * приложение не ветеринар.
  */
-function Observations({ date }) {
+function Observations({ date, revision = 0 }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [methodOpen, setMethodOpen] = useState(false)
 
+  // revision меняется при каждой правке карточки. Наблюдения считаются
+  // на сервере — из состояния страницы их не пересчитать, нужен запрос.
+  // Раньше зависимость была только от даты, и цифры оставались вчерашними
+  // до перезагрузки страницы.
   useEffect(() => {
     let cancelled = false
 
@@ -29,7 +33,7 @@ function Observations({ date }) {
     return () => {
       cancelled = true
     }
-  }, [date])
+  }, [date, revision])
 
   if (error) return <div className="error">{error}</div>
   if (!data) return null

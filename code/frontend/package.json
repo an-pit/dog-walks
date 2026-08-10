@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "TZ=Europe/Moscow vitest run",
+    "test:watch": "TZ=Europe/Moscow vitest"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -17,6 +19,7 @@
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.0.3",
-    "vite": "^4.4.5"
+    "vite": "^4.4.5",
+    "vitest": "^3.0.0"
   }
 }

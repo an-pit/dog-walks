@@ -110,30 +110,61 @@ export const api = {
   }
 }
 
-// Вспомогательные функции для работы с датами
+// Вспомогательные функции для работы с датами.
+//
+// ГЛАВНОЕ ПРАВИЛО: дата прогулки — это календарный день по местным часам,
+// а не момент времени. Ни одна из функций здесь не имеет права трогать UTC.
 export const dateUtils = {
+  /**
+   * Объект Date → 'YYYY-MM-DD' по местному календарю.
+   *
+   * Раньше здесь был toISOString(), и это молча ломало всё приложение
+   * по ночам: в UTC+3 объект «10 августа 01:00» превращается в строку
+   * «2026-08-09», потому что в Гринвиче ещё девятое. Заголовок страницы
+   * при этом рисуется локальным toLocaleDateString и показывает десятое.
+   * Получалось, что страница подписана одним днём, а читает и пишет другой.
+   */
   formatDate(date) {
-    return date.toISOString().split('T')[0]
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  },
+
+  /**
+   * 'YYYY-MM-DD' → объект Date на полдень местного времени.
+   *
+   * Полдень, а не полночь: new Date('2026-08-09') парсится как UTC,
+   * и в зонах западнее Гринвича даёт восьмое число. Середина суток
+   * переживает сдвиг в любую сторону до двенадцати часов.
+   */
+  parseDate(dateStr) {
+    return new Date(`${dateStr}T12:00:00`)
   },
 
   getWeekDates(startDate = new Date()) {
     const date = new Date(startDate)
+    // Время сбрасываем в полдень: дальше идёт арифметика по дням,
+    // а от полуночи она уязвима к переводу часов и к сдвигу в UTC
+    date.setHours(12, 0, 0, 0)
+
     const day = date.getDay()
+    // Неделя начинается с понедельника, поэтому воскресенье (day === 0)
+    // относится к предыдущей неделе, а не открывает следующую
     const diff = date.getDate() - day + (day === 0 ? -6 : 1)
     const monday = new Date(date.setDate(diff))
-    
+
     const week = []
     for (let i = 0; i < 7; i++) {
       const currentDate = new Date(monday)
       currentDate.setDate(monday.getDate() + i)
       week.push(currentDate)
     }
-    
+
     return week
   },
 
   addDays(date, days) {
     const result = new Date(date)
+    result.setHours(12, 0, 0, 0)
     result.setDate(result.getDate() + days)
     return result
   },

@@ -261,8 +261,8 @@ function StatsPage() {
 
 /** Длина периода в днях, включая обе границы */
 function daysBetween(from, to) {
-  const start = new Date(`${from}T12:00:00`)
-  const end = new Date(`${to}T12:00:00`)
+  const start = dateUtils.parseDate(from)
+  const end = dateUtils.parseDate(to)
   return Math.round((end - start) / 86400000) + 1
 }
 

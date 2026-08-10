@@ -22,14 +22,22 @@ jobs:
         working-directory: code/backend
         run: npm ci
 
-      - name: Прогнать тесты
+      - name: Прогнать тесты бэкенда
         working-directory: code/backend
         run: npm test
 
-      # Сборка фронтенда здесь не ради артефакта, а как проверка:
+      - name: Установить зависимости фронтенда
+        working-directory: code/frontend
+        run: npm ci
+
+      # Тесты дат. Раннер GitHub работает в UTC, а в UTC ошибки с часовыми
+      # поясами не воспроизводятся вовсе — поэтому зона задана в npm-скрипте.
+      - name: Прогнать тесты фронтенда
+        working-directory: code/frontend
+        run: npm test
+
+      # Сборка здесь не ради артефакта, а как проверка:
       # опечатка в JSX уронит сборку, и мы узнаем об этом до прода.
       - name: Собрать фронтенд
         working-directory: code/frontend
-        run: |
-          npm ci
-          npm run build
+        run: npm run build

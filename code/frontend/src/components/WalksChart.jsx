@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
+import { dateUtils, formatMinutes } from '../services/api'
 import './WalksChart.css'
 
 /**
@@ -9,6 +10,11 @@ import './WalksChart.css'
  * Цвета берутся из токенов, поэтому тёмная тема работает сама.
  */
 function WalksChart({ data }) {
+  // Индекс дня под курсором. null — курсор вне графика, тогда в панели
+  // показывается последний день периода: пустая панель дёргала бы вёрстку
+  // при каждом наведении.
+  const [active, setActive] = useState(null)
+
   const geometry = useMemo(() => {
     if (!data || data.length === 0) return null
 
@@ -42,22 +48,23 @@ function WalksChart({ data }) {
 
       return {
         ...d,
+        index: i,
         hasRecord,
+        centerX: toX(i),
         x: toX(i) - barWidth / 2,
         y: hasRecord && d.walks > 0 && barHeight < 3 ? padding.top + plotHeight - 3 : toY(d.minutes),
         width: barWidth,
         height: hasRecord && d.walks > 0 ? Math.max(3, barHeight) : barHeight,
+        // Точка на линии медианы — рисуется только для выбранного дня
+        baselineY: d.baseline === null ? null : toY(d.baseline),
+        // Зона захвата шире столбика и на всю высоту: попасть пальцем
+        // в пятнадцать пикселей на телефоне невозможно
+        hitX: toX(i) - stepX / 2,
+        hitWidth: stepX,
       }
     })
 
-    const gaps = data
-      .map((d, i) => ({ ...d, i }))
-      .filter((d) => d.hasRecord === false)
-      .map((d) => ({
-        date: d.date,
-        x: toX(d.i) - stepX / 2,
-        width: stepX,
-      }))
+    const gaps = bars.filter((d) => !d.hasRecord)
 
     // Линия медианы рвётся там, где базовой линии ещё нет
     const segments = []
@@ -87,13 +94,25 @@ function WalksChart({ data }) {
   // Подписи дат: показываем не все, иначе на месяце они сливаются
   const labelEvery = Math.ceil(bars.length / 8)
 
+  const shown = bars[active ?? bars.length - 1]
+  const pinned = active !== null
+
   return (
     <div className="chart">
+      {/* Панель значений. Живёт над графиком, а не всплывающей подсказкой:
+          подсказка на телефоне перекрывает то самое место, куда нажали */}
+      <div className="chart-readout" aria-live="polite">
+        <span className="chart-readout-date">{readoutDate(shown.date)}</span>
+        <span className="chart-readout-values">{readoutValues(shown)}</span>
+        {!pinned && <span className="chart-readout-hint">наведите на день</span>}
+      </div>
+
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="chart-svg"
         role="img"
         aria-label="График времени прогулок по дням со скользящей медианой"
+        onMouseLeave={() => setActive(null)}
       >
         {ticks.map((tick) => (
           <g key={tick.value}>
@@ -113,49 +132,64 @@ function WalksChart({ data }) {
         {gaps.map((gap) => (
           <rect
             key={`gap-${gap.date}`}
-            x={gap.x}
+            x={gap.hitX}
             y={padding.top}
-            width={gap.width}
+            width={gap.hitWidth}
             height={plotHeight}
             className="chart-gap"
-          >
-            <title>{gap.date}: записей нет</title>
-          </rect>
+          />
         ))}
 
-        {bars.map((bar) => (
-          <rect
-            key={bar.date}
-            x={bar.x}
-            y={bar.y}
-            width={bar.width}
-            height={bar.height}
-            rx="2"
-            className={bar.weekend ? 'chart-bar chart-bar-weekend' : 'chart-bar'}
-          >
-            <title>
-              {bar.date}:{' '}
-              {!bar.hasRecord
-                ? 'записей нет'
-                : bar.walks === 0
-                  ? 'никто не гулял'
-                  : bar.minutes > 0
-                    ? `${bar.minutes} мин, прогулок ${bar.walks}`
-                    : `прогулок ${bar.walks}, длительность не засекали`}
-              {bar.baseline !== null ? `, обычно ${bar.baseline}` : ''}
-            </title>
-          </rect>
-        ))}
+        {/* Вертикаль под выбранным днём: связывает столбик с линией медианы,
+            иначе на глаз не понять, какое именно значение с каким сравнивается */}
+        {pinned && (
+          <line
+            x1={shown.centerX}
+            y1={padding.top}
+            x2={shown.centerX}
+            y2={padding.top + plotHeight}
+            className="chart-cursor"
+          />
+        )}
+
+        <g className={pinned ? 'chart-bars chart-bars-dimmed' : 'chart-bars'}>
+          {bars.map((bar) => (
+            <rect
+              key={bar.date}
+              x={bar.x}
+              y={bar.y}
+              width={bar.width}
+              height={bar.height}
+              rx="2"
+              className={[
+                'chart-bar',
+                bar.weekend ? 'chart-bar-weekend' : '',
+                pinned && bar.index === active ? 'chart-bar-active' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            />
+          ))}
+        </g>
 
         {segments.map((points, i) => (
           <polyline key={i} points={points.join(' ')} className="chart-median" />
         ))}
 
+        {pinned && shown.baselineY !== null && (
+          <circle
+            cx={shown.centerX}
+            cy={shown.baselineY}
+            r="3.5"
+            className="chart-median-dot"
+          />
+        )}
+
         {bars.map((bar, i) =>
           i % labelEvery === 0 ? (
             <text
               key={`label-${bar.date}`}
-              x={bar.x + bar.width / 2}
+              x={bar.centerX}
               y={height - 8}
               className="chart-label"
             >
@@ -163,6 +197,25 @@ function WalksChart({ data }) {
             </text>
           ) : null
         )}
+
+        {/* Прозрачные зоны захвата поверх всего. Отдельным слоем, потому что
+            столбик нулевой высоты поймать курсором невозможно в принципе */}
+        {bars.map((bar) => (
+          <rect
+            key={`hit-${bar.date}`}
+            x={bar.hitX}
+            y={padding.top}
+            width={bar.hitWidth}
+            height={plotHeight}
+            className="chart-hit"
+            onMouseEnter={() => setActive(bar.index)}
+            onPointerDown={() => setActive(bar.index)}
+          >
+            <title>
+              {readoutDate(bar.date)}: {readoutValues(bar)}
+            </title>
+          </rect>
+        ))}
       </svg>
 
       <div className="chart-legend">
@@ -187,6 +240,55 @@ function WalksChart({ data }) {
       </div>
     </div>
   )
+}
+
+/** «9 августа, вс» — с днём недели: по нему сразу видно выходные */
+function readoutDate(dateStr) {
+  return dateUtils.parseDate(dateStr).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    weekday: 'short',
+  })
+}
+
+/**
+ * Значения дня одной строкой.
+ * Формулировки те же, что в подписях графика: «записей нет» и
+ * «никто не гулял» — разные факты, и смешивать их нельзя.
+ */
+function readoutValues(bar) {
+  if (!bar.hasRecord) return 'записей нет'
+  if (bar.walks === 0) return 'никто не гулял'
+
+  const parts = [
+    bar.minutes > 0 ? formatMinutes(bar.minutes) : 'время не засекали',
+    plural(bar.walks, 'прогулка', 'прогулки', 'прогулок'),
+  ]
+
+  if (bar.baseline !== null) {
+    const percent =
+      bar.baseline > 0 && bar.minutes > 0
+        ? Math.round(((bar.minutes - bar.baseline) / bar.baseline) * 100)
+        : null
+
+    parts.push(
+      percent === null
+        ? `обычно ${formatMinutes(bar.baseline)}`
+        : `обычно ${formatMinutes(bar.baseline)} (${percent > 0 ? '+' : ''}${percent}%)`
+    )
+  }
+
+  return parts.join(' · ')
+}
+
+function plural(count, one, few, many) {
+  const mod100 = count % 100
+  const mod10 = count % 10
+
+  if (mod100 >= 11 && mod100 <= 14) return `${count} ${many}`
+  if (mod10 === 1) return `${count} ${one}`
+  if (mod10 >= 2 && mod10 <= 4) return `${count} ${few}`
+  return `${count} ${many}`
 }
 
 export default WalksChart
