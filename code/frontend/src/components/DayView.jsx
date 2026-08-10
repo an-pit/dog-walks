@@ -20,6 +20,10 @@ function DayView() {
   const [error, setError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [currentSlot, setCurrentSlot] = useState('')
+  // Счётчик успешных правок. Итоги за день считаются здесь же из состояния
+  // и обновляются сами, а наблюдения приходят с сервера — им нужен повод
+  // перезапроситься.
+  const [revision, setRevision] = useState(0)
 
   const dateStr = dateUtils.formatDate(currentDate)
 
@@ -83,6 +87,7 @@ function DayView() {
 
     try {
       await api.updateWalk(dateStr, slot, next)
+      setRevision((n) => n + 1)
     } catch (err) {
       setError(err.message)
       loadWalks()
@@ -179,8 +184,9 @@ function DayView() {
 
       <SummaryStats summary={summary} title="Статистика за день" />
 
-      {/* key по дате: при смене дня наблюдения перезапрашиваются */}
-      <Observations key={dateStr} date={dateStr} />
+      {/* revision вместо key: пересчёт нужен, а вот перемонтирование блока
+          с миганием «загрузки» после каждого нажатия — нет */}
+      <Observations date={dateStr} revision={revision} />
 
       <SlotEditor
         isOpen={modalOpen}

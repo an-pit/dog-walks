@@ -24,6 +24,10 @@ jobs:
         working-directory: code/backend
         run: npm ci && npm test
 
+      - name: Тесты фронтенда
+        working-directory: code/frontend
+        run: npm ci && npm test
+
   deploy:
     needs: test          # без зелёных тестов деплой не начнётся
     runs-on: ubuntu-latest

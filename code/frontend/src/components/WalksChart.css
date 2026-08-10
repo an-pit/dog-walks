@@ -6,6 +6,42 @@
   width: 100%;
   height: auto;
   display: block;
+  /* Прозрачные зоны захвата перекрывают столбики, поэтому нативные
+     подсказки браузера здесь не сработали бы — значения показывает панель */
+  touch-action: pan-y;
+}
+
+/* Панель значений. Высота фиксирована, чтобы график не подпрыгивал
+   при наведении: слева дата, справа цифры */
+.chart-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-height: 22px;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.chart-readout-date {
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+.chart-readout-values {
+  color: var(--text-secondary);
+}
+
+.chart-readout-hint {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 480px) {
+  .chart-readout-hint {
+    display: none;
+  }
 }
 
 .chart-grid {
@@ -31,6 +67,7 @@
 .chart-bar {
   fill: var(--accent);
   opacity: 0.75;
+  transition: opacity var(--transition);
 }
 
 /* Выходные отличаются оттенком: в них прогулки заметно длиннее,
@@ -38,6 +75,40 @@
 .chart-bar-weekend {
   fill: var(--ira);
   opacity: 0.6;
+}
+
+/* Когда день выбран, остальные столбики приглушаются. Подсвечивать
+   выбранный ярче нельзя — он и так на пределе насыщенности цвета,
+   разница была бы незаметна */
+.chart-bars-dimmed .chart-bar {
+  opacity: 0.25;
+}
+
+.chart-bars-dimmed .chart-bar-active,
+.chart-bars-dimmed .chart-bar-active.chart-bar-weekend {
+  opacity: 1;
+}
+
+/* Вертикаль под выбранным днём — связывает столбик с линией медианы */
+.chart-cursor {
+  stroke: var(--text-tertiary);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.5;
+}
+
+.chart-median-dot {
+  fill: var(--warning);
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+/* Зоны захвата: прозрачные, но события ловят. Без pointer-events
+   прозрачный прямоугольник в SVG курсор не замечает */
+.chart-hit {
+  fill: transparent;
+  pointer-events: all;
+  cursor: pointer;
 }
 
 /* День без единой записи — бледная полоса на всю высоту.
